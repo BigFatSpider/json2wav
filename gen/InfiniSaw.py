@@ -1,3 +1,5 @@
+# Copyright Dan Price. All rights reserved.
+
 import blep
 import numpy as np
 
