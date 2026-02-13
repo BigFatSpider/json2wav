@@ -6,7 +6,47 @@ project(json2wav)
 
 set(CMAKE_CXX_STANDARD 23)
 
-list(APPEND COMPILER_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wno-unused-parameter -Wno-missing-field-initializers)
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release)
+endif()
+
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-Wall" COMPILER_SUPPORTS_WALL)
+if(COMPILER_SUPPORTS_WALL)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+endif()
+CHECK_CXX_COMPILER_FLAG("-Wextra" COMPILER_SUPPORTS_WEXTRA)
+if(COMPILER_SUPPORTS_WEXTRA)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
+endif()
+CHECK_CXX_COMPILER_FLAG("-Wpedantic" COMPILER_SUPPORTS_WPEDANTIC)
+if(COMPILER_SUPPORTS_WPEDANTIC)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
+endif()
+CHECK_CXX_COMPILER_FLAG("-Wshadow" COMPILER_SUPPORTS_WSHADOW)
+if(COMPILER_SUPPORTS_WSHADOW)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wshadow")
+endif()
+CHECK_CXX_COMPILER_FLAG("-Wno-unused-parameter" COMPILER_SUPPORTS_WNO_UNUSED_PARAMETER)
+if(COMPILER_SUPPORTS_WNO_UNUSED_PARAMETER)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
+endif()
+CHECK_CXX_COMPILER_FLAG("-Wno-missing-field-initializers" COMPILER_SUPPORTS_WNO_MISSING_FIELD_INITIALIZERS)
+if(COMPILER_SUPPORTS_WNO_MISSING_FIELD_INITIALIZERS)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers")
+endif()
+CHECK_CXX_COMPILER_FLAG("-m64" COMPILER_SUPPORTS_M64)
+if(COMPILER_SUPPORTS_M64)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64")
+endif()
+CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
+CHECK_CXX_COMPILER_FLAG("-flto" COMPILER_SUPPORTS_FLTO)
+if(COMPILER_SUPPORTS_FLTO)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+endif()
 
 add_library(JsonToWav
 	src/Bessel.cpp src/DrumHit.cpp src/InfiniSaw.cpp
@@ -34,9 +74,6 @@ add_library(JsonToWav
 	src/ZeroInit.h
 )
 
-target_compile_options(JsonToWav PRIVATE "${COMPILER_WARNINGS}")
-
 add_executable(json2wav src/json2wav.cpp)
-target_compile_options(json2wav PRIVATE "${COMPILER_WARNINGS}")
 target_link_libraries(json2wav JsonToWav)
 
