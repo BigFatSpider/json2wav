@@ -1,0 +1,188 @@
+# Copyright Dan Price. All rights reserved.
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def get_evalp(c):
+    lenc = len(c)
+    def evalp(xval):
+        yval = 0
+        for n in range(lenc):
+            yval *= xval
+            yval += c[lenc - 1 - n]
+        return yval
+    return evalp
+
+def plot(c, npts=100, db=False):
+    x = [n/(npts - 1) for n in range(npts)]
+    evalp = get_evalp(c)
+    y = [evalp(xval) for xval in x]
+    if db:
+        for n in range(len(y)):
+            yval = y[n]
+            dbval = 20*np.log10(yval) if yval != 0 else -145
+            y[n] = -145 if dbval < -145 else dbval
+    plt.plot(x, y, color='green')
+    plt.show()
+
+def deriv(c, n=1):
+    o = c
+    while n > 0:
+        o = [i*o[i] for i in range(1, len(o))]
+        n -= 1
+    return o
+
+def poly(nz0, nz1, pt=None):
+    if nz0 < 0:
+        nz0 = 0
+    if nz1 < 0:
+        nz1 = 0
+    nc = 1 + nz1 + (1 if pt is not None else 0)
+    a = []
+    b = []
+    pstart = nz0 + 1
+    p = [0] * pstart
+    drv = p + [1] * nc
+    a.append(drv[pstart:])
+    b.append(1)
+    for n in range(1, nz1 + 1):
+        drv = deriv(drv)
+        a.append([0] * max(0, n - pstart) + drv[max(0, pstart - n):])
+        b.append(0)
+    if pt is not None:
+        x = pt[0]
+        a.append([x**(nz0 + 1 + n) for n in range(nc)])
+        b.append(pt[1])
+    c = np.linalg.solve(a, b)
+    p.extend(c)
+    return p
+
+def get_poly(c_in=0, c_out=0, pts=None):
+    ''' c_in: Continuity at x=0
+        c_out: Continuity at x=1
+        pts: Points to pass through
+    '''
+    c_in = max(0, c_in)
+    c_out = max(0, c_out)
+    if pts is None:
+        pts = []
+    n = c_in + c_out + len(pts) + 2
+    a = []
+    b = []
+    for i in range(c_in + 1):
+        a.append([1 if j == i else 0 for j in range(n)])
+        b.append(0)
+    a.append([1]*n)
+    b.append(1)
+    for i in range(1, c_out + 1):
+        arr = [0]*n
+        for j in range(i, n):
+            arr[j] = arr[j - 1] + a[-1][j - 1]
+        a.append(arr)
+        b.append(0)
+    for pt in pts:
+        a.append([pt[0]**i for i in range(n)])
+        b.append(pt[1])
+    return list(np.linalg.solve(a, b))
+
+def gen_ramp_text(fname, nz0, nz1, pt=None):
+    sp0 = None
+    sp1 = None
+    if pt is not None:
+        sp0 = str(pt[0][0]) + '/' + str(pt[0][1])
+        sp1 = str(pt[1])
+        pt = (pt[0][0] / pt[0][1], pt[1])
+    c = poly(nz0, nz1, pt)
+    return gen_ramp_text_poly(c, fname, nz0, nz1, sp0, sp1)
+
+def gen_ramp_text_poly(c, fname, nz0, nz1, sp0, sp1, sparr=None):
+    text = ''
+    text += '\ttemplate<typename FloatType>\n'
+    text += '\tinline FloatType ' + fname + '(const FloatType x) noexcept\n'
+    text += '\t{\n'
+    text += '\t\tstatic_assert(IsFloatType<FloatType>::value, "AlbumBot::RampDetail::HitPoly() only operates on float types");\n\n'
+    text += '\t\t/** Polynomial on [0, 1] with the following constraints:\n'
+    linelead = '\t\t * '
+    constraints = []
+    constraints.append(('Start at 0', 'f(0) = 0'))
+    constraints.append(('End at 1', 'f(1) = 1'))
+    if sp0 is not None:
+        constraints.append(('Pass through (' + sp0 + ', ' + sp1 + ')', 'f(' + sp0 + ') = ' + sp1))
+    if sparr is not None:
+        for sp in sparr:
+            sp0, sp1 = sp
+            constraints.append(('Pass through (' + sp0 + ', ' + sp1 + ')', 'f(' + sp0 + ') = ' + sp1))
+    def strord(n):
+        if n == 1:
+            return '1st'
+        if n == 2:
+            return '2nd'
+        if n == 3:
+            return '3rd'
+        return str(n) + 'th'
+    for n in range(1, nz0 + 1):
+        constraints.append((strord(n) + ' derivative 0 at start', 'f' + ("'" * n) + '(0) = 0'))
+    for n in range(1, nz1 + 1):
+        constraints.append((strord(n) + ' derivative 0 at end', 'f' + ("'" * n) + '(1) = 0'))
+    maxtext = 0
+    for constraint in constraints:
+        lentext = len(constraint[0])
+        if lentext > maxtext:
+            maxtext = lentext
+    for idx, straint in enumerate(constraints):
+        text += linelead + str(idx + 1) + ') ' + straint[0] + ': ' + (
+            ' ' * (maxtext - len(straint[0]) - (1 if idx > 8 else 0))) + straint[1] + '\n'
+    text += '\t\t */\n\n'
+    c.reverse()
+    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    openparens = ''
+    equation = ''
+    closeparen = ''
+    for i, co in enumerate(c):
+        if co == 0:
+            continue
+        varletter = alphabet[i]
+        text += '\t\tstatic const FloatType ' + varletter + ' = static_cast<FloatType>(' + str(co) + ');\n'
+        if len(equation) > 0:
+            equation += ' + '
+            openparens += '('
+            closeparen = ')'
+        equation += varletter + closeparen + '*x'
+    for n in range(nz0):
+        equation += '*x'
+    equation += ';\n'
+    text += '\n\t\treturn ' + openparens + equation
+    text += '\t}\n'
+    return text
+
+def gen_ramp_file():
+    text = ''
+    text += '// Copyright Dan Price. All rights reserved.\n\n'
+    text += '/////////////////////////////////////\n'
+    text += '////  Generated by transient.py  ////\n'
+    text += '////  !!DO NOT EDIT MANUALLY!!!  ////\n'
+    text += '/////////////////////////////////////\n\n'
+    text += '#pragma once\n\n'
+    text += '#include "FastSin.h"\n\n'
+    text += 'namespace AlbumBot::RampDetail\n'
+    text += '{\n'
+    text += gen_ramp_text('HitPoly262', 2, 6, ((1,3), 2))
+    text += '\n'
+    text += gen_ramp_text('HitPoly272', 2, 7, ((13,42), 2))
+    text += '\n'
+    text += gen_ramp_text('HitPoly282', 2, 8, ((2,7), 2))
+    text += '\n'
+    text += gen_ramp_text('HitPoly292', 2, 9, ((5,19), 2))
+    text += '\n'
+    text += gen_ramp_text('HitPoly2A2', 2, 10, ((12,49), 2))
+    text += '\n'
+    poly2624 = get_poly(2, 6, [(0.085, 0.5), (0.17, 1.5), (0.29, 2), (0.43, 1.7)])
+    text += gen_ramp_text_poly(poly2624, 'HitPoly2624', 2, 6, None, None, [('0.085', '0.5'), ('0.17', '1.5'), ('0.29', '2'), ('0.43', '1.7')])
+    text += '}\n\n'
+
+    with open('Ramp.gen.h', 'w') as f:
+        f.write(text)
+
+if __name__ == '__main__':
+    gen_ramp_file()
+
