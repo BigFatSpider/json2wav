@@ -51,16 +51,6 @@ namespace json2wav
 		return pathstr;
 	}
 
-	class IJsonInterpreter
-	{
-	public:
-		virtual ~IJsonInterpreter() noexcept {}
-		virtual void OnString(const JsonPath& path, std::string&& value) {}
-		virtual void OnNumber(const JsonPath& path, double value) {}
-		virtual void OnBool(const JsonPath& path, bool value) {}
-		virtual void OnNull(const JsonPath& path) {}
-	};
-
 	class IJsonWalker
 	{
 	public:
@@ -185,18 +175,10 @@ namespace json2wav
 		};
 
 	public:
-		JsonParser() : i(nullptr), interpret(nullptr), walk(nullptr), c('\0') {}
+		JsonParser() : i(nullptr), walk(nullptr), c('\0') {}
 
-		JsonParser(std::istream& input, IJsonInterpreter& interpreter) : JsonParser() { parse(input, interpreter); }
 		JsonParser(std::istream& input, IJsonWalker& walker) : JsonParser() { parse(input, walker); }
 		JsonParser(std::istream& input, IJsonLogger& logger) : JsonParser(input, logger.walker) {}
-
-		bool parse(std::istream& input, IJsonInterpreter& interpreter)
-		{
-			i = &input;
-			setInterpreter(interpreter);
-			return parseInternal();
-		}
 
 		bool parse(std::istream& input, IJsonWalker& walker)
 		{
@@ -238,7 +220,6 @@ namespace json2wav
 		void clear() noexcept
 		{
 			i = nullptr;
-			interpret = nullptr;
 			walk = nullptr;
 			path.clear();
 			c = '\0';
@@ -252,21 +233,6 @@ namespace json2wav
 			OnNumber_mf = nullptr;
 			OnBool_mf = nullptr;
 			OnNull_mf = nullptr;
-		}
-
-		void setInterpreter(IJsonInterpreter& interpreter)
-		{
-			interpret = &interpreter;
-
-			OnPushNodeKey_mf = &JsonParser::OnPushNodeKey_Interpret;
-			OnPushNodeIdx_mf = &JsonParser::OnPushNodeIdx_Interpret;
-			OnNextNodeKey_mf = &JsonParser::OnNextNodeKey_Interpret;
-			OnNextNodeIdx_mf = &JsonParser::OnNextNodeIdx_Interpret;
-			OnPopNode_mf = &JsonParser::OnPopNode_Interpret;
-			OnString_mf = &JsonParser::OnString_Interpret;
-			OnNumber_mf = &JsonParser::OnNumber_Interpret;
-			OnBool_mf = &JsonParser::OnBool_Interpret;
-			OnNull_mf = &JsonParser::OnNull_Interpret;
 		}
 
 		void setWalker(IJsonWalker& walker)
@@ -362,7 +328,7 @@ namespace json2wav
 				struct Scope
 				{
 					Scope(JsonParser& jparse) : j(jparse) {}
-					~Scope() noexcept { j.i = nullptr; j.interpret = nullptr; j.walk = nullptr; }
+					~Scope() noexcept { j.i = nullptr; j.walk = nullptr; }
 					JsonParser& j;
 				} _(*this);
 
@@ -649,43 +615,6 @@ namespace json2wav
 			(this->*OnNull_mf)();
 		}
 
-		void OnPushNodeKey_Interpret(std::string&& nodekey)
-		{
-			path.emplace_back(std::move(nodekey));
-		}
-		void OnPushNodeIdx_Interpret()
-		{
-			path.emplace_back((size_t)0);
-		}
-		void OnNextNodeKey_Interpret(std::string&& nodekey)
-		{
-			path.back() = std::move(nodekey);
-		}
-		void OnNextNodeIdx_Interpret()
-		{
-			++path.back().idx;
-		}
-		void OnPopNode_Interpret()
-		{
-			path.pop_back();
-		}
-		void OnString_Interpret(std::string&& value)
-		{
-			interpret->OnString(path, std::move(value));
-		}
-		void OnNumber_Interpret(double value)
-		{
-			interpret->OnNumber(path, value);
-		}
-		void OnBool_Interpret(bool value)
-		{
-			interpret->OnBool(path, value);
-		}
-		void OnNull_Interpret()
-		{
-			interpret->OnNull(path);
-		}
-
 		void OnPushNodeKey_Walk(std::string&& nodekey)
 		{
 			walk->OnPushNode(std::move(nodekey));
@@ -725,7 +654,6 @@ namespace json2wav
 
 	private:
 		std::istream* i;
-		IJsonInterpreter* interpret;
 		IJsonWalker* walk;
 		JsonPath path;
 		char c;
