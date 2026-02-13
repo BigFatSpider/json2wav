@@ -1,4 +1,4 @@
-// Copyright Dan Price. All rights reserved.
+// Copyright Dan Price 2026.
 
 #include "DrumHit.h"
 #include "DrumHit.gen.cpp"
