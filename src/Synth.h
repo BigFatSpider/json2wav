@@ -71,7 +71,6 @@ namespace json2wav
 			, phase(phase_init)
 			, phaseoffset(0.0)
 			, deltaphase_cached(0.0)
-			//, deltatime_cached(0.0)
 			, frequency_ramp(frequency_init, 0.0)
 			, amplitude_ramp(amplitude_init, 0.0)
 			, phase_ramp(phase_init, 0.0)
@@ -132,50 +131,24 @@ namespace json2wav
 	protected:
 		void Increment(const double deltaTime)
 		{
-#if 0
-			static constexpr const double MaxPhase = 1.0;
-			static constexpr const double TwoMaxPhase = 2.0 * MaxPhase;
-#endif
-
-			//if (deltatime_cached != deltaTime)
-			//{
-			//	deltatime_cached = deltaTime;
-			//}
-
-			//if (frequency_ramp.Increment(frequency, deltatime_cached))
 			if (frequency_ramp.Increment(frequency, deltaTime))
 			{
-				//deltaphase_cached = frequency * deltatime_cached;
 				deltaphase_cached = frequency * deltaTime;
 				OnFrequencyChange(frequency, deltaTime);
 			}
 			const auto nextphase(phase + deltaphase_cached);
 			phase = (phase - std::floor(nextphase)) + deltaphase_cached;
 
-			//amplitude_ramp.Increment(amplitude, deltatime_cached);
 			if (amplitude_ramp.Increment(amplitude, deltaTime))
 			{
 				OnAmplitudeChange(amplitude, deltaTime);
 			}
 
-			//if (phase_ramp.Increment(phaseoffset, deltatime_cached))
 			if (phase_ramp.Increment(phaseoffset, deltaTime))
 			{
-#if 0
-				if (phaseoffset > MaxPhase)
-					phaseoffset -= TwoMaxPhase;
-				else if (phaseoffset < MaxPhase)
-					phaseoffset += TwoMaxPhase;
-#else
 				phaseoffset -= std::floor(phaseoffset);
-#endif
 				OnPhaseOffsetChange(phaseoffset, deltaTime);
 			}
-
-#if 0
-			if (phase > MaxPhase)
-				phase -= TwoMaxPhase;
-#endif
 		}
 
 		template<typename ProcSampFunc>
@@ -214,7 +187,6 @@ namespace json2wav
 		double phase;
 		double phaseoffset;
 		double deltaphase_cached;
-		//double deltatime_cached;
 		Ramp frequency_ramp;
 		Ramp amplitude_ramp;
 		PreciseRamp phase_ramp;
