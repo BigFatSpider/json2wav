@@ -1,4 +1,4 @@
-# Copyright Dan Price. All rights reserved.
+# Copyright Dan Price 2026.
 
 import blep
 import numpy as np
@@ -86,7 +86,7 @@ def write_to_infinisaw_files(
         hcoeffs_fast, hblep_len_fast, hzc_fast,
         hcoeffs_xfast, hblep_len_xfast, hzc_xfast):
     with open("InfiniSaw.gen.h", 'w') as f:
-        f.write('// Copyright Dan Price. All rights reserved.\n\n')
+        f.write('// Copyright Dan Price 2026.\n\n')
         f.write('#include "Quintic.h"\n')
         f.write('#include "Septic.h"\n')
         f.write('#include "Nonic.h"\n\n')

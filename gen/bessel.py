@@ -1,4 +1,4 @@
-# Copyright Dan Price. All rights reserved.
+# Copyright Dan Price 2026.
 
 from scipy import special as sp
 from scipy.optimize import fsolve
@@ -12,7 +12,7 @@ dfactor = 1/d
 broken = [231, 244, 281, 288, 347, 348, 357, 405, 406, 419, 437, 505, 506, 507, 570, 582, 591, 643, 644, 655, 658, 679, 706, 713, 722, 752, 756, 757, 764, 775, 840]
 
 def get_copyright_notice():
-    return '// Copyright Dan Price. All rights reserved.\n\n'
+    return '// Copyright Dan Price 2026.\n\n'
 
 def get_gen_notice():
     contents = "//////////////////////////////////\n"
