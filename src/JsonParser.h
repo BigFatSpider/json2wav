@@ -611,9 +611,7 @@ namespace json2wav
 			return false;
 		}
 
-		// Use the more functional-programming-ish technique of pointer-to-member variables instead of
-		// inheritance-based polymorphism, which would require a polymorphic strategy object either on
-		// the heap or managed by placement new shenanigans
+		// Function pointers to avoid lifetime management
 		void OnPushNode(std::string&& nodekey)
 		{
 			(this->*OnPushNodeKey_mf)(std::move(nodekey));

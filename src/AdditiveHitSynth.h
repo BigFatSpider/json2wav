@@ -2,8 +2,6 @@
 
 #pragma once
 
-//#include "DrumHit.h"
-//#include "Bessel.h"
 #include "SineSynth.h"
 #include "Synth.h"
 #include "Ramp.h"
@@ -76,17 +74,6 @@ namespace json2wav
 			, filtdels{ 0.0f, 0.0f, 0.0f, 0.005f }
 			, dumb(MakeShared<BasicAudioSum<false, false>>())
 		{
-			/*for (size_t order = 0; order < DrumHit::NumOrders; ++order)
-			{
-				for (size_t zero = 0; zero < DrumHit::NumZeroes; ++zero)
-				{
-					//freqs[order][zero] = 0.0f;
-					amps[order][zero] = 0.0f;
-					phases[order][zero] = 0.0;
-					dphases[order][zero] = 0.0;
-				}
-			}*/
-
 			dumb->AddInput(this);
 			if (bActivateFilters)
 				ActivateFilters();
