@@ -8,9 +8,7 @@ namespace json2wav
 {
 	namespace Math
 	{
-		template<typename T, uint_fast8_t order> struct Binomial
-		//{ static_assert(false, "json2wav::Binomial is not implemented for order 0 or orders > 16"); }
-		;
+		template<typename T, uint_fast8_t order> struct Binomial;
 		template<typename T> struct Binomial<T, 1>
 		{ using type = Math::ArrayHolder<T, 1, 1>; };
 		template<typename T> struct Binomial<T, 2>
