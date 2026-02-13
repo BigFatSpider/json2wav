@@ -223,31 +223,11 @@ namespace json2wav
 			walk = nullptr;
 			path.clear();
 			c = '\0';
-
-			OnPushNodeKey_mf = nullptr;
-			OnPushNodeIdx_mf = nullptr;
-			OnNextNodeKey_mf = nullptr;
-			OnNextNodeIdx_mf = nullptr;
-			OnPopNode_mf = nullptr;
-			OnString_mf = nullptr;
-			OnNumber_mf = nullptr;
-			OnBool_mf = nullptr;
-			OnNull_mf = nullptr;
 		}
 
 		void setWalker(IJsonWalker& walker)
 		{
 			walk = &walker;
-
-			OnPushNodeKey_mf = &JsonParser::OnPushNodeKey_Walk;
-			OnPushNodeIdx_mf = &JsonParser::OnPushNodeIdx_Walk;
-			OnNextNodeKey_mf = &JsonParser::OnNextNodeKey_Walk;
-			OnNextNodeIdx_mf = &JsonParser::OnNextNodeIdx_Walk;
-			OnPopNode_mf = &JsonParser::OnPopNode_Walk;
-			OnString_mf = &JsonParser::OnString_Walk;
-			OnNumber_mf = &JsonParser::OnNumber_Walk;
-			OnBool_mf = &JsonParser::OnBool_Walk;
-			OnNull_mf = &JsonParser::OnNull_Walk;
 		}
 
 		void error()
@@ -577,77 +557,39 @@ namespace json2wav
 			return false;
 		}
 
-		// Function pointers to avoid lifetime management
 		void OnPushNode(std::string&& nodekey)
-		{
-			(this->*OnPushNodeKey_mf)(std::move(nodekey));
-		}
-		void OnPushNode()
-		{
-			(this->*OnPushNodeIdx_mf)();
-		}
-		void OnNextNode(std::string&& nodekey)
-		{
-			(this->*OnNextNodeKey_mf)(std::move(nodekey));
-		}
-		void OnNextNode()
-		{
-			(this->*OnNextNodeIdx_mf)();
-		}
-		void OnPopNode()
-		{
-			(this->*OnPopNode_mf)();
-		}
-		void OnString(std::string&& value)
-		{
-			(this->*OnString_mf)(std::move(value));
-		}
-		void OnNumber(double value)
-		{
-			(this->*OnNumber_mf)(value);
-		}
-		void OnBool(bool value)
-		{
-			(this->*OnBool_mf)(value);
-		}
-		void OnNull()
-		{
-			(this->*OnNull_mf)();
-		}
-
-		void OnPushNodeKey_Walk(std::string&& nodekey)
 		{
 			walk->OnPushNode(std::move(nodekey));
 		}
-		void OnPushNodeIdx_Walk()
+		void OnPushNode()
 		{
 			walk->OnPushNode();
 		}
-		void OnNextNodeKey_Walk(std::string&& nodekey)
+		void OnNextNode(std::string&& nodekey)
 		{
 			walk->OnNextNode(std::move(nodekey));
 		}
-		void OnNextNodeIdx_Walk()
+		void OnNextNode()
 		{
 			walk->OnNextNode();
 		}
-		void OnPopNode_Walk()
+		void OnPopNode()
 		{
 			walk->OnPopNode();
 		}
-		void OnString_Walk(std::string&& value)
+		void OnString(std::string&& value)
 		{
 			walk->OnString(std::move(value));
 		}
-		void OnNumber_Walk(double value)
+		void OnNumber(double value)
 		{
 			walk->OnNumber(value);
 		}
-		void OnBool_Walk(bool value)
+		void OnBool(bool value)
 		{
 			walk->OnBool(value);
 		}
-		void OnNull_Walk()
+		void OnNull()
 		{
 			walk->OnNull();
 		}
@@ -657,21 +599,6 @@ namespace json2wav
 		IJsonWalker* walk;
 		JsonPath path;
 		char c;
-		
-		typedef void (JsonParser::*StrCB_t)(std::string&&);
-		typedef void (JsonParser::*NumCB_t)(double);
-		typedef void (JsonParser::*BoolCB_t)(bool);
-		typedef void (JsonParser::*VoidCB_t)();
-
-		StrCB_t OnPushNodeKey_mf;
-		VoidCB_t OnPushNodeIdx_mf;
-		StrCB_t OnNextNodeKey_mf;
-		VoidCB_t OnNextNodeIdx_mf;
-		VoidCB_t OnPopNode_mf;
-		StrCB_t OnString_mf;
-		NumCB_t OnNumber_mf;
-		BoolCB_t OnBool_mf;
-		VoidCB_t OnNull_mf;
 	};
 }
 
