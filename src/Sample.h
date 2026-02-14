@@ -225,46 +225,43 @@ namespace json2wav
 
 		Sample_old& operator+=(const Sample_old& other) noexcept
 		{
-			//if (type == other.type)
-			//{
-				switch (type)
+			switch (type)
+			{
+			case ESampleType::Int16:
 				{
-				case ESampleType::Int16:
+					const int32_t sum = static_cast<int32_t>(value.i16) + static_cast<int32_t>(other.AsInt16());
+					if (sum > static_cast<int32_t>(INT16_MAX))
 					{
-						const int32_t sum = static_cast<int32_t>(value.i16) + static_cast<int32_t>(other.AsInt16());
-						if (sum > static_cast<int32_t>(INT16_MAX))
-						{
-							value.i16 = INT16_MAX;
-						}
-						else if (sum < static_cast<int32_t>(INT16_MIN))
-						{
-							value.i16 = INT16_MIN;
-						}
-						else
-						{
-							value.i16 = static_cast<int16_t>(sum);
-						}
-					} break;
-				case ESampleType::Int24:
+						value.i16 = INT16_MAX;
+					}
+					else if (sum < static_cast<int32_t>(INT16_MIN))
 					{
-						const int32_t sum = value.i24 + other.AsInt24();
-						if (sum > INT24_MAX)
-						{
-							value.i24 = INT24_MAX;
-						}
-						else if (sum < INT24_MIN)
-						{
-							value.i24 = INT24_MIN;
-						}
-						else
-						{
-							value.i24 = sum;
-						}
-					} break;
-				case ESampleType::Float32: value.f32 += other.AsFloat32(); break;
-				default: break;
-				}
-			//}
+						value.i16 = INT16_MIN;
+					}
+					else
+					{
+						value.i16 = static_cast<int16_t>(sum);
+					}
+				} break;
+			case ESampleType::Int24:
+				{
+					const int32_t sum = value.i24 + other.AsInt24();
+					if (sum > INT24_MAX)
+					{
+						value.i24 = INT24_MAX;
+					}
+					else if (sum < INT24_MIN)
+					{
+						value.i24 = INT24_MIN;
+					}
+					else
+					{
+						value.i24 = sum;
+					}
+				} break;
+			case ESampleType::Float32: value.f32 += other.AsFloat32(); break;
+			default: break;
+			}
 
 			return *this;
 		}
@@ -275,46 +272,43 @@ namespace json2wav
 
 		Sample_old& operator-=(const Sample_old& other) noexcept
 		{
-			//if (type == other.type)
-			//{
-				switch (type)
+			switch (type)
+			{
+			case ESampleType::Int16:
 				{
-				case ESampleType::Int16:
+					const int32_t diff = static_cast<int32_t>(value.i16) - static_cast<int32_t>(other.AsInt16());
+					if (diff > static_cast<int32_t>(INT16_MAX))
 					{
-						const int32_t diff = static_cast<int32_t>(value.i16) - static_cast<int32_t>(other.AsInt16());
-						if (diff > static_cast<int32_t>(INT16_MAX))
-						{
-							value.i16 = INT16_MAX;
-						}
-						else if (diff < static_cast<int32_t>(INT16_MIN))
-						{
-							value.i16 = INT16_MIN;
-						}
-						else
-						{
-							value.i16 = static_cast<int16_t>(diff);
-						}
-					} break;
-				case ESampleType::Int24:
+						value.i16 = INT16_MAX;
+					}
+					else if (diff < static_cast<int32_t>(INT16_MIN))
 					{
-						const int32_t diff = value.i24 - other.AsInt24();
-						if (diff > INT24_MAX)
-						{
-							value.i24 = INT24_MAX;
-						}
-						else if (diff < INT24_MIN)
-						{
-							value.i24 = INT24_MIN;
-						}
-						else
-						{
-							value.i24 = diff;
-						}
-					} break;
-				case ESampleType::Float32: value.f32 -= other.AsFloat32(); break;
-				default: break;
-				}
-			//}
+						value.i16 = INT16_MIN;
+					}
+					else
+					{
+						value.i16 = static_cast<int16_t>(diff);
+					}
+				} break;
+			case ESampleType::Int24:
+				{
+					const int32_t diff = value.i24 - other.AsInt24();
+					if (diff > INT24_MAX)
+					{
+						value.i24 = INT24_MAX;
+					}
+					else if (diff < INT24_MIN)
+					{
+						value.i24 = INT24_MIN;
+					}
+					else
+					{
+						value.i24 = diff;
+					}
+				} break;
+			case ESampleType::Float32: value.f32 -= other.AsFloat32(); break;
+			default: break;
+			}
 
 			return *this;
 		}
@@ -362,27 +356,9 @@ namespace json2wav
 			{
 			case ESampleType::Int16: return value.i16;
 			case ESampleType::Int24: return Sample_old(AsFloat32()).AsInt16(); // Convert to float 32 for dither
-				//return static_cast<int16_t>(((value.i24 & 0xffffff00) >> 8) |
-				//							 ((value.i24 & 0x80000000) ? 0xff000000 : 0));
 			case ESampleType::Float32: return static_cast<int16_t>((value.f32 > 1.0f) ? INT16_MAX :
 											   (value.f32 < -1.0f) ? INT16_MIN : std::round(value.f32 *
 												   (static_cast<float>(INT16_MAX) + 0.49f) - 0.5f + dither()));
-			/*case ESampleType::Float32:
-				{
-					if (value.f32 > 1.0f)
-						return INT16_MAX;
-					if (value.f32 < -1.0f)
-						return INT16_MIN;
-					uint32_t fBits;
-					const char* const src(reinterpret_cast<const char*>(&value.f32));
-					char* const dest(reinterpret_cast<char*>(&fBits));
-					dest[0] = src[0];
-					dest[1] = src[1];
-					dest[2] = src[2];
-					dest[3] = src[3];
-					return static_cast<int16_t>(std::round(value.f32 *
-						(static_cast<float>(INT16_MAX) + (fBits >> 31)) + dither()));
-				}*/
 			}
 			return 0;
 		}
@@ -396,22 +372,6 @@ namespace json2wav
 			case ESampleType::Float32: return static_cast<int32_t>((value.f32 > 1.0f) ? INT24_MAX :
 											   (value.f32 < -1.0f) ? INT24_MIN : std::round(value.f32 *
 												  (static_cast<float>(INT24_MAX) + 0.49f) - 0.5f + dither()));
-			/*case ESampleType::Float32:
-				{
-					if (value.f32 > 1.0f)
-						return INT24_MAX;
-					if (value.f32 < -1.0f)
-						return INT24_MIN;
-					uint32_t fBits;
-					const char* const src(reinterpret_cast<const char*>(&value.f32));
-					char* const dest(reinterpret_cast<char*>(&fBits));
-					dest[0] = src[0];
-					dest[1] = src[1];
-					dest[2] = src[2];
-					dest[3] = src[3];
-					return static_cast<int32_t>(std::round(value.f32 *
-						(static_cast<float>(INT24_MAX) + (fBits >> 31)) + dither()));
-				}*/
 			}
 			return 0;
 		}
@@ -422,8 +382,6 @@ namespace json2wav
 			{
 			case ESampleType::Int16: return (static_cast<float>(value.i16) + 0.5f) / (static_cast<float>(INT16_MAX) + 0.5f);
 			case ESampleType::Int24: return (static_cast<float>(value.i24) + 0.5f) / (static_cast<float>(INT24_MAX) + 0.5f);
-			//case ESampleType::Int16: return static_cast<float>(value.i16) / (static_cast<float>(INT16_MAX) + (value.i16 >> 15));
-			//case ESampleType::Int24: return static_cast<float>(value.i24) / (static_cast<float>(INT24_MAX) + ((value.i24 >> 23) & 1));
 			case ESampleType::Float32: return value.f32;
 			}
 			return 0.0f;
@@ -442,7 +400,6 @@ namespace json2wav
 
 		static Sample** InitializeBufs(const size_t bufSize, const size_t numChannels)
 		{
-			//Sample* buf = static_cast<Sample*>(salloc(bufSize * sizeof(Sample)));
 			Sample** const bufs = [numChannels]() { std::scoped_lock lock(allocmtx); return challoc(numChannels); }();
 			if (bufs)
 			{
@@ -606,7 +563,6 @@ namespace json2wav
 		{
 			if (idx >= numChannels)
 			{
-				//throw std::out_of_range("SampleBuf::operator[]: Index out of range");
 				return nullptr;
 			}
 			return bufs[idx];
@@ -616,7 +572,6 @@ namespace json2wav
 		{
 			if (idx >= numChannels)
 			{
-				//throw std::out_of_range("SampleBuf::operator[]: Index out of range");
 				return nullptr;
 			}
 			return bufs[idx];

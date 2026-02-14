@@ -215,16 +215,13 @@ namespace json2wav
 		}
 
 		template<template<typename> typename DistType>
-		//template<typename DistType>
 		T operator()(DistType<T>& dist)
-		//T operator()(DistType& dist)
 		{
 			return dist(mt);
 		}
 
 	private:
 		Seed seed;
-		//std:: mt;
 		MT_t<T> mt;
 	};
 
