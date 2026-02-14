@@ -356,9 +356,6 @@ namespace json2wav
 		template<typename... Ts>
 		bool AddEvent(const size_t samplenum, Ts&&... args)
 		{
-			//static_assert(std::is_base_of_v<ControlObject, AddEventType> || std::is_base_of_v<AddEventType, ControlObject>, "ControlObject's AddEventType template parameter must be in the same inheritance hierarchy as ControlObject");
-			//return (static_cast<AddEventType*>(this)->*&AddEventType::template AddEventInternal<EventType>)(samplenum, std::forward<Ts>(args)...);
-			//using AddEventType::AddEventInternal;
 			return static_cast<AddEventType*>(this)->template AddEventInternal<EventType>(samplenum, std::forward<Ts>(args)...);
 		}
 
@@ -496,13 +493,5 @@ namespace json2wav
 		size_t currentSampleNum;
 		bool bRefreshEvents;
 	};
-
-	//template<typename EventType, typename AddEventType /* = ControlObjectHolder::ControlObjectBase */>
-	//template<typename... Ts>
-	//bool ControlObject<EventType, AddEventType>::AddEvent(const size_t samplenum, Ts&&... args)
-	//{
-	//	static_assert(std::is_base_of_v<ControlObject<EventType, AddEventType>, AddEventType> || std::is_base_of_v<AddEventType, ControlObject<EventType, AddEventType>>, "ControlObject's AddEventType template parameter must be in the same inheritance hierarchy as ControlObject");
-	//	return (static_cast<AddEventType*>(this)->*&AddEventType::template AddEventInternal<EventType>)(samplenum, std::forward<Ts>(args)...);
-	//}
 }
 
