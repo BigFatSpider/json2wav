@@ -218,45 +218,6 @@ namespace json2wav
 						}
 					}
 
-#if 0
-					size_t bufnum = 0;
-					{
-						Sample* const inbuf = inbufs[bufnum][ch];
-						for (size_t i = 0; i < bufSize; ++i)
-						{
-							chbuf[i] = inbuf[i];
-						}
-					}
-					++bufnum;
-
-					for ( ; bufnum < bufsWritten; ++bufnum)
-					{
-						Sample* const inbuf = inbufs[bufnum][ch];
-						for (size_t i = 0; i < bufSize; ++i)
-						{
-							chbuf[i] += inbuf[i];
-						}
-					}
-#else
-
-#if 0
-					// Pairwise summation
-					for (size_t skip = 1; skip < bufsWritten; skip <<= 1)
-					{
-						for (size_t bufnum = skip; bufnum < bufsWritten; bufnum += skip << 1)
-						{
-							Sample* const inbuflo = inbufs[bufnum - skip][ch];
-							Sample* const inbufhi = inbufs[bufnum][ch];
-							for (size_t i = 0; i < bufSize; ++i)
-								inbuflo[i] += inbufhi[i];
-						}
-					}
-					const Sample* const inbuf = inbufs[0][ch];
-					for (size_t i = 0; i < bufSize; ++i)
-						chbuf[i] = inbuf[i];
-#endif
-
-#endif
 					JoinChannel(ch, inbufs, chbuf, bufSize, bufsWritten);
 				}
 
@@ -335,23 +296,6 @@ namespace json2wav
 			const size_t bufsWritten) noexcept override
 		{
 			sumjoin.JoinChannel(ch, inbufs, chbuf, bufSize, bufsWritten);
-
-#if 0
-			// Pairwise summation
-			for (size_t skip = 1; skip < bufsWritten; skip <<= 1)
-			{
-				for (size_t bufnum = skip; bufnum < bufsWritten; bufnum += skip << 1)
-				{
-					Sample* const inbuflo = inbufs[bufnum - skip][ch];
-					Sample* const inbufhi = inbufs[bufnum][ch];
-					for (size_t i = 0; i < bufSize; ++i)
-						inbuflo[i] += inbufhi[i];
-				}
-			}
-			const Sample* const inbuf = inbufs[0][ch];
-			for (size_t i = 0; i < bufSize; ++i)
-				chbuf[i] = inbuf[i];
-#endif
 		}
 
 	private:
@@ -446,68 +390,9 @@ namespace json2wav
 			const size_t bufsWritten) noexcept override
 		{
 			rmjoin.JoinChannel(ch, inbufs, chbuf, bufSize, bufsWritten);
-
-#if 0
-			const size_t bufSizeX2 = bufSize << 1;
-
-			if (us2.size() <= ch)
-			{
-				us2.resize(ch + 1);
-				ds2.resize(ch + 1);
-			}
-
-			if (worklo.size() < bufSizeX2)
-			{
-				worklo.resize(bufSizeX2);
-				workhi.resize(bufSizeX2);
-			}
-
-			// Upsampled x2 pairwise multiplication
-			double* const workbuflo = worklo.data();
-			double* const workbufhi = workhi.data();
-			auto& chus(us2[ch]);
-			auto& chds(ds2[ch]);
-			for (size_t skip = 1, dsidx = 0; skip < bufsWritten; skip <<= 1, ++dsidx)
-			{
-				const size_t usidxlo = dsidx << 1;
-				const size_t usidxhi = usidxlo + 1;
-				if (chus.size() <= usidxhi)
-					chus.resize(usidxhi + 1);
-				if (chds.size() <= dsidx)
-					chds.resize(dsidx + 1);
-				auto& vuslo(chus[usidxlo]);
-				auto& vushi(chus[usidxhi]);
-				auto& vds(chds[dsidx]);
-				for (size_t bufnum = skip, osidx = 0; bufnum < bufsWritten; bufnum += skip << 1, ++osidx)
-				{
-					Sample* const inbuflo = inbufs[bufnum - skip][ch];
-					Sample* const inbufhi = inbufs[bufnum       ][ch];
-					if (vuslo.size() <= osidx)
-					{
-						vuslo.resize(osidx + 1);
-						vushi.resize(osidx + 1);
-						vds.resize(osidx + 1);
-					}
-					vuslo[osidx].process_unsafe(bufSize, inbuflo, workbuflo);
-					vushi[osidx].process_unsafe(bufSize, inbufhi, workbufhi);
-					for (size_t i = 0; i < bufSizeX2; ++i)
-						workbuflo[i] *= workbufhi[i];
-					vds[osidx].process_unsafe(bufSize, workbuflo, inbuflo);
-				}
-			}
-
-			const Sample* const inbuf = inbufs[0][ch];
-			for (size_t i = 0; i < bufSize; ++i)
-				chbuf[i] = inbuf[i];
-#endif
 		}
 
 	private:
-		//Vector<double> worklo;
-		//Vector<double> workhi;
-		//Vector<Vector<Vector<oversampling::upsampler441_x2<double>>>> us2;
-		//Vector<Vector<Vector<oversampling::downsampler441_x2<double>>>> ds2;
-
 		RingModJoin rmjoin;
 	};
 
@@ -752,17 +637,14 @@ namespace json2wav
 
 			if (queueEnd + numToRead <= queueLength)
 			{
-				//GetSamples(fillStart.data(), numChannels, numToRead, sampleRate, this);
 				this->GetInputSamples(fillStart.data(), numChannels, numToRead, sampleRate);
 				queueEnd = (queueEnd + numToRead) & (queueLength - 1);
 			}
 			else
 			{
 				const size_t filledToEnd = queueLength - queueEnd;
-				//GetSamples(fillStart.data(), numChannels, filledToEnd, sampleRate, this);
 				this->GetInputSamples(fillStart.data(), numChannels, filledToEnd, sampleRate);
 				queueEnd = numToRead - filledToEnd;
-				//GetSamples(queue.get(), numChannels, queueEnd, sampleRate, this);
 				this->GetInputSamples(queue.get(), numChannels, queueEnd, sampleRate);
 			}
 		}

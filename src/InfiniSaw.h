@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <stdexcept>
 #include <atomic>
-//#include <fstream>
 #include <cmath>
 
 #define INFINISAW_ANTIALIAS 1
@@ -212,7 +211,6 @@ namespace json2wav
 #if INFINISAW_LOG_BLEPSPIKE
 			, bBsLog(true)
 #endif
-			//, fileidx(NextFileIdx())
 		{
 		}
 
@@ -232,7 +230,6 @@ namespace json2wav
 #if INFINISAW_LOG_BLEPSPIKE
 			, bBsLog(true)
 #endif
-			//, fileidx(NextFileIdx())
 		{
 		}
 
@@ -251,7 +248,6 @@ namespace json2wav
 #if INFINISAW_LOG_BLEPSPIKE
 			, bBsLog(true)
 #endif
-			//, fileidx(NextFileIdx())
 		{
 		}
 
@@ -367,11 +363,6 @@ namespace json2wav
 					float freq;
 					PeekNextWaveformSample(nullptr, deltaTime, nextPhase, amp, freq);
 					GetJumpsInPhaseRange(currentPhase, nextPhase, i, buf64[i], foundit != hardSyncs.end(), sampleStreamJumps);
-					//if (GetJumpsInPhaseRange(currentPhase, nextPhase, i, buf[i].AsFloat32(), foundit != hardSyncs.end(), sampleStreamJumps) > 1)
-					//{
-						//const float maxFreq = sampleRate * 0.5f;
-						//buf[i] = currentAmp * AdditiveWaveform(currentPhase, currentFreq, maxFreq);
-					//}
 
 					if (foundit != hardSyncs.end())
 					{
@@ -398,47 +389,12 @@ namespace json2wav
 			PeekNextWaveformSample(&nextSample, deltaTime, endPhase, amp, freq, blep_peek - 1);
 			GetJumpsInPhaseRange(endPhase, postEndPhase, numSamples + blep_peek - 1, nextSample, false, sampleStreamJumps);
 
-#if 0
-			// TODO: Pairwise summation
-			Vector<JumpMetadata> aaQueue;
-			aaQueue.reserve(antiAliasQueue.size());
-			while (!antiAliasQueue.empty())
-				aaQueue.push_back(antiAliasQueue.pop());
-			Vector<const JumpMetadata*> jumps;
-			auto jumpsOntoIdx = [this, &sampleStreamJumps, &jumps](const size_t idx)
-			{
-				jumps.clear();
-				if (idx < blep_peek)
-				{
-					for (const JumpData& jump : aaQueue)
-					{
-						if (std::max(jump.idx, idx) - std::min(jump.idx, idx) < blep_peek)
-						{
-							jumps.push_back(&jump);
-						}
-					}
-				}
-			};
-
-			for (size_t buf_idx = 0, stmjmp_idx = 0; buf_idx < numSamples; ++buf_idx)
-			{
-				{
-					buf64[buf_idx] += (double)GetAmpAtBufIdx(buf_idx) * (double)jump.amp * GetBlepRes(blep_idx, jump.pos);
-				}
-			}
-#else
 			while (!antiAliasQueue.empty())
 			{
 				const JumpMetadata& jump = antiAliasQueue.peek();
 				AA_LOG("Next jump in anti-alias queue: idx=" + std::to_string(jump.idx) + ", pos=" + std::to_string(jump.pos) + ", amp=" + std::to_string(jump.amp));
 				for (size_t blep_idx = jump.idx, buf_idx = 0, blep_size = GetBlepSize(); blep_idx < blep_size; ++blep_idx, ++buf_idx)
 				{
-					//const float blep_res = GetBlepRes(blep_idx, jump.pos);
-					//const float newsample = buf[buf_idx].AsFloat32() + GetAmpAtBufIdx(buf_idx) * jump.amp * blep_res;
-					//BS_LOG(((newsample < 0.0f) == (buf[buf_idx].AsFloat32() < 0.0f)) && ((newsample * newsample) > (0.25f * 0.25f)) && ((newsample * newsample) > (4.0f * [](const float x) { return x * x; }(buf[buf_idx].AsFloat32()))), "Spike at sample " + std::to_string(buf_idx) + ". Was " + std::to_string(buf[buf_idx].AsFloat32()) + " is " + std::to_string(newsample));
-					//AA_LOG("\tSample at buf idx " + std::to_string(buf_idx) + ": before=" + std::to_string(buf[buf_idx].AsFloat32()) + ", after=" + std::to_string(newsample) + ", blep res=" + std::to_string(blep_res));
-					//buf[buf_idx] = newsample;
-
 					// DISABLE TO TEST POPS
 					const double blepres = static_cast<double>(GetAmpAtBufIdx(buf_idx)) * static_cast<double>(jump.amp) * GetBlepRes(blep_idx, jump.pos);
 					buf64[buf_idx] += blepres;
@@ -468,14 +424,6 @@ namespace json2wav
 					LOG_SPIKE("Blep index", blep_idx);
 					LOG_SPIKE("Buffer index", buf_idx);
 
-					//const float blep_res = GetBlepRes(blep_idx, jmp_smp_pos);
-					//LOG_SPIKE("Blep residue", blep_res);
-					//const float newsample = buf[buf_idx].AsFloat32() + GetAmpAtBufIdx(buf_idx) * jmp_amp * blep_res;
-					//LOG_SPIKE("New sample", newsample);
-					//BS_LOG(((newsample < 0.0f) == (buf[buf_idx].AsFloat32() < 0.0f)) && ((newsample * newsample) > (0.25f * 0.25f)) && ((newsample * newsample) > (4.0f * [](const float x) { return x * x; }(buf[buf_idx].AsFloat32()))), "Spike at sample " + std::to_string(buf_idx) + ". Was " + std::to_string(buf[buf_idx].AsFloat32()) + " is " + std::to_string(newsample));
-					//AA_LOG("\tSample at buf idx " + std::to_string(buf_idx) + ": before=" + std::to_string(buf[buf_idx].AsFloat32()) + ", after=" + std::to_string(newsample) + ", blep res=" + std::to_string(blep_res));
-					//buf[buf_idx] = newsample;
-
 					// DISABLE TO TEST POPS
 					const double blepres = static_cast<double>(GetAmpAtBufIdx(buf_idx)) * jmp_amp * GetBlepRes(blep_idx, jmp_smp_pos);
 					buf64[buf_idx] += blepres;
@@ -484,7 +432,6 @@ namespace json2wav
 				if (blep_idx < blep_size && jmp_idx < numSamples)
 					antiAliasQueue.push(blep_idx, jmp_smp_pos, jmp_amp);
 			}
-#endif
 
 			for (size_t smp = 0; smp < numSamples; ++smp)
 			{
@@ -584,10 +531,6 @@ namespace json2wav
 		{
 			Increment(deltaTime);
 			const double normalizedPhase = GetInstantaneousPhase();
-#if 0
-			const double phase = GetInstantaneousPhase();
-			const double normalizedPhase = phase - std::floor(phase);
-#endif
 			const float amp = GetAmplitude();
 			const double output = amp * Waveform2(normalizedPhase);
 			outNormalizedPhase = normalizedPhase;
@@ -662,28 +605,6 @@ namespace json2wav
 				for (; i < jumps.size(); ++i)
 					if (jumps[i].pos >= phase1)
 						break;
-
-				/*
-			for (jump in jumps)
-			{
-				const double sawPhase1 = phase1 - jump.pos;
-				const double wrap1 = ((FloatToBits(sawPhase1) & SignBit<double>::value) >> BitNum<SignBit<double>::value>::value);
-				const double sawNormPhase1 = sawPhase1 + wrap1;
-				wavePos1 += static_cast<double>(jump.amp) * (0.5 - sawNormPhase1);
-			}
-				*/
-				/*
-			for (jump in jumps)
-			{
-				const double sawPhase2 = phase2 - jump.pos;
-				const double wrap2 = ((FloatToBits(sawPhase2) & SignBit<double>::value) >> BitNum<SignBit<double>::value>::value);
-				const double sawNormPhase2 = sawPhase2 + wrap2;
-				wavePos += static_cast<double>(jump.amp) * (0.5 - sawNormPhase2);
-			}
-				*/
-
-				//for (jump in jumps)
-				//	wavePos += static_cast<double>(jump.amp)*((static_cast<double>(int(phase >= jump.pos)) - 0.5) + (jump.pos - phase));
 
 				// Higher precision to prevent high frequencies rounding to the wrong side of the blep residue
 				const double phaseStretch = 1.0 / (phase2 - phase1);
@@ -803,7 +724,6 @@ namespace json2wav
 		static double GetBlepResPrecise(const size_t blep_idx, const double jmp_pos)
 		{
 			// TODO: Ensure rounding error from multiply vs. divide is acceptable
-			//const double blep_pos = ((double)blep_idx + 0.5 - jmp_pos) / static_cast<double>(BLEP_POLYS);
 			constexpr const double scaling = 1.0 / static_cast<double>(BLEP_POLYS);
 			const double blep_pos = ((double)blep_idx + 0.5 - jmp_pos) * scaling;
 			if (blep_pos < 0.0 || blep_pos >= 1.0)
@@ -1114,59 +1034,6 @@ namespace json2wav
 #if INFINISAW_LOG_BLEPSPIKE
 		bool bBsLog;
 #endif
-
-		/*
-		static std::ofstream*& GetNaiveSawFilePtr(const size_t idx)
-		{
-			static std::ofstream* apfiles[1024] = { 0 };
-			return apfiles[idx & 1023];
-		}
-		static std::ofstream& GetNaiveSawFile(const size_t idx)
-		{
-			std::ofstream*& pfile = GetNaiveSawFilePtr(idx);
-			if (!pfile)
-				pfile = new std::ofstream("naivesaw" + std::to_string(idx) + ".wav", std::ios::write | std::ios::binary);
-			return *pfile;
-		}
-		static void CloseNaiveSawFile(const size_t idx)
-		{
-			std::ofstream*& pfile = GetNaiveSawFilePtr(idx);
-			if (pfile)
-			{
-				delete pfile;
-				pfile = nullptr;
-			}
-		}
-
-		static std::ofstream*& GetBlepResFilePtr(const size_t idx)
-		{
-			static std::ofstream* apfiles[1024] = { 0 };
-			return apfiles[idx & 1023];
-		}
-		static std::ofstream& GetBlepResFile(const size_t idx)
-		{
-			std::ofstream*& pfile = GetBlepResFilePtr(idx);
-			if (!pfile)
-				pfile = new std::ofstream("blepres" + std::to_string(idx) + ".wav", std::ios::write | std::ios::binary);
-			return *pfile;
-		}
-		static void CloseBlepResFile(const size_t idx)
-		{
-			std::ofstream*& pfile = GetBlepResFilePtr(idx);
-			if (pfile)
-			{
-				delete pfile;
-				pfile = nullptr;
-			}
-		}
-
-		static size_t NextFileIdx()
-		{
-			static std::atomic<size_t> nextfileidx = 0;
-			return nextfileidx++;
-		}
-		size_t fileidx;
-		*/
 
 	private:
 		static Array<BlepPolyType, BLEP_POLYS> blep_precise;
