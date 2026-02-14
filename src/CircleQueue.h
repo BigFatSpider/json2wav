@@ -120,34 +120,9 @@ namespace json2wav
 			{
 				throw std::length_error("StaticCircleQueue is full; couldn't push");
 			}
-			//data[finish] = T(std::forward<ParamTypes>(params)...);
 			new(raw_data + finish * sizeof(T)) T(std::forward<ParamTypes>(params)...);
 			finish = newFinish;
 		}
-
-/*
-		void push(const T& item)
-		{
-			const size_t newFinish = mask & (finish + 1);
-			if (newFinish == start)
-			{
-				throw std::length_error("StaticCircleQueue is full; couldn't push");
-			}
-			data[finish] = item;
-			finish = newFinish;
-		}
-
-		void push(T&& item)
-		{
-			const size_t newFinish = mask & (finish + 1);
-			if (newFinish == start)
-			{
-				throw std::length_error("StaticCircleQueue is full; couldn't push");
-			}
-			data[finish] = std::move(item);
-			finish = newFinish;
-		}
-*/
 
 		T pop()
 		{

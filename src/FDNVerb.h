@@ -184,22 +184,6 @@ namespace json2wav
 					static constexpr const bool bmt64 = sizeof(size_t) > 4;
 					std::conditional_t<bmt64, std::mt19937_64, std::mt19937> mt(rd());
 
-#if 0
-					std::uniform_int_distribution<size_t> dist(randomDelayMin, randomDelayMax);
-					Vector<bool> delayCheck(randomDelayMax, false);
-					size_t maxdly = randomDelayMin;
-					for (size_t i = 0; i < 8; ++i)
-					{
-						size_t roll = dist(mt);
-						while (delayCheck[roll])
-							roll = dist(mt);
-						delayCheck[roll] = true;
-						if (roll > maxdly)
-							maxdly = roll;
-						delays[i] = roll;
-					}
-#endif
-
 					const size_t randomDelayRange = randomDelayMax - randomDelayMin;
 					const size_t rangeLimits[9] = {
 						randomDelayMin,
@@ -404,7 +388,6 @@ namespace json2wav
 								: work[i-1 - delays[v]][v];
 					for (size_t i = 0; i < maxdly; ++i)
 						dlybufs[i] = tmpbufs[i];
-
 				}
 
 				void Filter(Vector<math::matrix::VerticalVector<8, float>>& work)
@@ -426,7 +409,6 @@ namespace json2wav
 
 				void Spread(Vector<math::matrix::VerticalVector<8, float>>& work)
 				{
-					//static constexpr const float sq8inv = static_cast<float>(0.5*math::f64::sq2inv);
 					static const math::matrix::HadamardMatrix<8> hadmtx;
 					for (auto& frame : work)
 						frame = (hadmtx*frame);
@@ -554,11 +536,9 @@ namespace json2wav
 							echotime = delays[i];
 					}
 					delaybuf.resize(echotime);
-					//tmpbuf.resize(echotime);
 					for (size_t i = 0; i < echotime; ++i)
 						for (size_t v = 0; v < 8; ++v)
 							delaybuf[i][v] = 0;
-					//delayline.resize(chwork.size());
 				}
 
 				for (size_t i = 0; i < chwork.size(); ++i)
@@ -574,76 +554,13 @@ namespace json2wav
 				{
 					delaybuf[i] = (chwork.size() + i < delaybuf.size()) ? delaybuf[chwork.size() + i] : chwork[chwork.size() + i - delaybuf.size()];
 				}
-
-#if 0
-				// For each sample:
-				// 1. Add delay output
-				// 2. Copy to output and to delay input
-
-				// Copy current signal
-				for (size_t i = 0; i < chwork.size(); ++i)
-					delayline[i] = chwork[i];
-
-				// Delay copied signal
-				const size_t maxdly = delaybuf.size();
-				for (size_t i = 0; i < maxdly; ++i)
-				{
-					const size_t dlyidx = delayline.size() + i;
-					tmpbuf[i] = (dlyidx < maxdly)
-						? delaybuf[dlyidx]
-						: delayline[dlyidx - maxdly];
-				}
-				for (size_t i = delayline.size(); i > 0; --i)
-					for (size_t v = 0; v < 8; ++v)
-						delayline[i-1][v] = (delays[v] > i-1)
-							? delaybuf[maxdly + i-1 - delays[v]][v]
-							: delayline[i-1 - delays[v]][v];
-				for (size_t i = 0; i < maxdly; ++i)
-					delaybuf[i] = tmpbuf[i];
-
-				// Filter/reflect copied, delayed signal and add to current signal
-				for (size_t i = 0; i < chwork.size(); ++i)
-				{
-					auto frame = reflector*delayline[i];
-					airfilter200ms(frame);
-					chwork[i] += frame;
-				}
-
-				for (size_t i = 0, end = std::min(delaybuf.size(), chwork.size()); i < end; ++i)
-					chwork[i] += delaybuf[i];
-
-				const size_t echotime = delaybuf.size();
-				for (size_t i = echotime; i < chwork.size(); ++i)
-				{
-					auto frame = reflector*chwork[i - echotime];
-					airfilter200ms(frame);
-					chwork[i] += frame;
-				}
-
-				for (size_t i = 0; i < echotime; ++i)
-				{
-					if (chwork.size() + i < echotime)
-					{
-						delaybuf[i] = delaybuf[chwork.size() + i];
-					}
-					else
-					{
-						auto frame = reflector*chwork[chwork.size() + i - echotime];
-						airfilter200ms(frame);
-						delaybuf[i] = frame;
-					}
-				}
-#endif
-
 			}
 
 		private:
 			size_t delays[8];
 			Vector<math::matrix::VerticalVector<8, float>> chwork;
 			Vector<math::matrix::VerticalVector<8, float>> diffused;
-			//Vector<math::matrix::VerticalVector<8, float>> delayline;
 			Vector<math::matrix::VerticalVector<8, float>> delaybuf;
-			//Vector<math::matrix::VerticalVector<8, float>> tmpbuf;
 			Diffuser diffuser0;
 			Diffuser diffuser1;
 			Diffuser diffuser2;

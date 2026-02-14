@@ -234,9 +234,6 @@ namespace json2wav
 								float acc[8];
 								_mm_store_ps(acc, acc0);
 								_mm_store_ps(acc + 4, acc1);
-								//for (size_t j = 1; j < 8; ++j)
-									//acc[0] += acc[j];
-								//smp = acc[0];
 								acc[0] += acc[1];
 								acc[2] += acc[3];
 								acc[4] += acc[5];
@@ -244,12 +241,6 @@ namespace json2wav
 								acc[0] += acc[2];
 								acc[4] += acc[6];
 								smp = acc[0] + acc[4];
-
-								/*acc0 = _mm_hadd_ps(acc0, acc1);
-								acc0 = _mm_hadd_ps(acc0, acc0);
-								float acc[4];
-								_mm_store_ps(acc, acc0);
-								smp = acc[0] + acc[1];*/
 #endif
 							}
 

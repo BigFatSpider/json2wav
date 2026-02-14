@@ -6,7 +6,6 @@
 #include "IControlObject.h"
 #include "Ramp.h"
 #include "FastSin.h"
-#include "FastTan.h"
 #include "Binomial.h"
 #include "BesselPoly.h"
 #include <utility>
@@ -45,51 +44,10 @@ namespace json2wav::Filter
 
 	enum class ETopo
 	{
-		/*DF1, DirectForm1 = DF1, TDF1, TransposedDirectForm1 = TDF1,*/ DF2, DirectForm2 = DF2, TDF2, TransposedDirectForm2 = TDF2
+		DF2, DirectForm2 = DF2, TDF2, TransposedDirectForm2 = TDF2
 	};
 
 	template<ETopo eTopo> struct Topo;
-
-	/*template<> struct Topo<ETopo::DF1>
-	{
-		template<typename FloatType, size_t order>
-		static void DoFilter(Sample& smp, FloatType (&z)[order], const FloatType (&a)[order], const FloatType(&b)[order + 1], FloatType* const zo)
-		{
-			const FloatType smpin = smp.AsFloat32();
-			FloatType smpout = b[0] * smpin;
-			for (uint_fast8_t j = 0; j < order; ++j)
-			{
-				smpout += b[j + 1] * z[j] - a[j] * zo[j];
-			}
-			for (uint_fast8_t j = 1; j < order; ++j)
-			{
-				z[order - j] = z[order - j - 1];
-				zo[order - j] = zo[order - j - 1];
-			}
-			z[0] = smpin;
-			z[0] = smpout;
-			smp = static_cast<float>(smpout);
-		}
-	};
-
-	template<> struct Topo<ETopo::TDF1>
-	{
-		template<typename FloatType, size_t order>
-		static void DoFilter(Sample& smp, FloatType (&z)[order], const FloatType (&a)[order], const FloatType(&b)[order + 1], FloatType* const zo)
-		{
-			const FloatType smpin = smp.AsFloat32();
-			const FloatType mid = smpin + z[0];
-			const FloatType smpout = b[0] * mid + zo[0];
-			for (uint_fast8_t j = 1; j < order; ++j)
-			{
-				z[j - 1] = z[j] - a[j - 1] * mid;
-				zo[j - 1] = z[j] + b[j] * mid;
-			}
-			z[order - 1] = -a[order - 1] * mid;
-			zo[order - 1] = b[order] * mid;
-			smp = static_cast<float>(smpout);
-		}
-	};*/
 
 	template<> struct Topo<ETopo::DF2>
 	{
@@ -188,15 +146,10 @@ namespace json2wav::Filter
 	{
 		// Fast bilinear transform
 		const FloatType halfW = vHalfTau<FloatType>::value * static_cast<FloatType>(freq);
-		//const FloatType ctau = std::tan(vQuarterTau<FloatType>::value - (halfW * deltaTime));
-		//const FloatType ctau = static_cast<FloatType>(4.0) / static_cast<FloatType>(order) * FastCot<FloatType>(halfW * deltaTime);
-		//const FloatType ctau = FastCot<FloatType>(halfW * deltaTime);
 		// FastCot doesn't appear significantly faster than std::tan
 		const FloatType ctau = std::tan(vQuarterTau<FloatType>::value - (halfW * deltaTime));
 		const FloatType alpha = ctau;
 		const FloatType beta = -ctau;
-		//const FloatType delta = static_cast<FloatType>(1.0);
-		//const FloatType gamma = static_cast<FloatType>(1.0);
 		FloatType tab[order + 1][order + 1];
 		laplace.Update();
 		for (uint_fast8_t n = 0; n <= order; ++n)
@@ -216,7 +169,7 @@ namespace json2wav::Filter
 				const uint_fast8_t bRow = targetRow;
 				const uint_fast8_t bCol = targetCol + 1;
 				const FloatType denom = static_cast<FloatType>(order - targetRow - targetCol);
-				tab[targetRow][targetCol] = (/* delta * */ aRow * tab[aRow][aCol] + alpha * bCol * tab[bRow][bCol]) / denom;
+				tab[targetRow][targetCol] = (aRow * tab[aRow][aCol] + alpha * bCol * tab[bRow][bCol]) / denom;
 			}
 		}
 		FloatType denomPoly[order + 1];
@@ -231,7 +184,7 @@ namespace json2wav::Filter
 			for (uint_fast8_t j = 0; j <= order - k; ++j)
 			{
 				const uint_fast8_t i = order - k - j;
-				denomPoly[k] += tab[i][j] * /*(gammaPower[i]) * */ betaPower[j];
+				denomPoly[k] += tab[i][j] * betaPower[j];
 			}
 		}
 		const FloatType norm = static_cast<FloatType>(1) / denomPoly[order];
@@ -247,15 +200,6 @@ namespace json2wav::Filter
 	{
 		virtual ~IFilterState() noexcept {}
 		virtual void Recalc(const FloatType deltaTime, const FreqType freq) = 0;
-		//virtual uint_fast8_t GetOrder() const = 0;
-		//virtual uint_fast8_t GetNumChannels() const = 0;
-		//virtual const FloatType* GetA() const = 0;
-		//virtual size_t GetALen() const = 0;
-		//virtual const FloatType* GetB() const = 0;
-		//virtual size_t GetBLen() const = 0;
-		//virtual FloatType* const* GetZ() = 0;
-		//virtual size_t GetZLen() const = 0;
-		//virtual size_t GetZLenLen() const = 0;
 		virtual void DoFilter(const uint_fast8_t ch, Sample& smp, const ETopo eTopo) = 0;
 	};
 
@@ -274,15 +218,6 @@ namespace json2wav::Filter
 		~FilterState() noexcept = default;
 		virtual void Recalc(const FloatType deltaTime, const FreqType freq) override
 		{ DoRecalc(deltaTime, freq, laplace, b, a); }
-		//virtual uint_fast8_t GetOrder() const override { return order; }
-		//virtual uint_fast8_t GetNumChannels() const override { return numch; }
-		//virtual const FloatType* GetA() const override { return a; }
-		//virtual size_t GetALen() const override { return order; }
-		//virtual const FloatType* GetB() const override { return b; }
-		//virtual size_t GetBLen() const override { return order + 1; }
-		//virtual FloatType* const* GetZ() override { return z; }
-		//virtual size_t GetZLen() const override { return numch; }
-		//virtual size_t GetZLenLen() const override { return order; }
 		virtual void DoFilter(const uint_fast8_t ch, Sample& smp, const ETopo eTopo) override
 		{
 			switch (eTopo)
@@ -433,8 +368,6 @@ namespace json2wav::Filter
 		{
 			if (numChannels != numch)
 			{
-				//throw std::logic_error("Tried to call GetSamples with " + std::to_string(numChannels) +
-				//	" channels on a " + std::to_string(numch) + "-channel filter");
 				this->IncrementSampleNum(numSamples);
 				return;
 			}
@@ -529,72 +462,6 @@ namespace json2wav::Filter
 		{
 			DoRecalc<order>(deltaTime, this->GetFrequency(), laplace, b, a);
 		}
-		/*{
-			// Fast bilinear transform
-			const FloatType halfW = vHalfTau<FloatType>::value * static_cast<FloatType>(this->GetFrequency());
-			//const FloatType ctau = std::tan(vQuarterTau<FloatType>::value - (halfW * deltaTime));
-			//const FloatType ctau = static_cast<FloatType>(4.0) / static_cast<FloatType>(order) * FastCot<FloatType>(halfW * deltaTime);
-			//const FloatType ctau = FastCot<FloatType>(halfW * deltaTime);
-			// FastCot doesn't appear significantly faster than std::tan
-			const FloatType ctau = std::tan(vQuarterTau<FloatType>::value - (halfW * deltaTime));
-			const FloatType alpha = ctau;
-			const FloatType beta = -ctau;
-			//const FloatType delta = static_cast<FloatType>(1.0);
-			//const FloatType gamma = static_cast<FloatType>(1.0);
-			FloatType tab[order + 1][order + 1];
-			laplace.Update();
-			for (uint_fast8_t n = 0; n <= order; ++n)
-			{
-				const uint_fast8_t rowidx = order - n;
-				const uint_fast8_t colidx = n;
-				tab[rowidx][colidx] = laplace[n];
-			}
-			for (uint_fast8_t i = 0; i < order; ++i)
-			{
-				for (uint_fast8_t j = 0, end = order - i; j < end; ++j)
-				{
-					const uint_fast8_t targetRow = order - 1 - i - j;
-					const uint_fast8_t targetCol = j;
-					const uint_fast8_t aRow = targetRow + 1;
-					const uint_fast8_t aCol = targetCol;
-					const uint_fast8_t bRow = targetRow;
-					const uint_fast8_t bCol = targetCol + 1;
-					const FloatType denom = static_cast<FloatType>(order - targetRow - targetCol);
-					tab[targetRow][targetCol] = (// delta *
-						aRow * tab[aRow][aCol] + alpha * bCol * tab[bRow][bCol]) / denom;
-				}
-			}
-			FloatType denomPoly[order + 1];
-			for (uint_fast8_t i = 0; i <= order; ++i)
-			{
-				denomPoly[i] = static_cast<FloatType>(0);
-			}
-			FloatType betaPower[order + 1];
-			betaPower[0] = static_cast<FloatType>(1);
-			for (uint_fast8_t j = 1; j <= order; ++j)
-			{
-				betaPower[j] = betaPower[j - 1] * beta;
-			}
-			for (uint_fast8_t k = 0; k <= order; ++k)
-			{
-				for (uint_fast8_t j = 0; j <= order - k; ++j)
-				{
-					const uint_fast8_t i = order - k - j;
-					denomPoly[k] += tab[i][j] * //(gammaPower[i]) *
-						betaPower[j];
-				}
-			}
-			const FloatType norm = static_cast<FloatType>(1) / denomPoly[order];
-			b[0] = norm;
-			for (uint_fast8_t n = 1; n <= order; ++n)
-			{
-				b[n] = norm * Math::Binomial_t<FloatType, order>::data[n];
-			}
-			for (uint_fast8_t n = 0, orderm1 = order - 1; n < order; ++n)
-			{
-				a[n] = norm * denomPoly[orderm1 - n];
-			}
-		}*/
 
 	private:
 		LaplaceType laplace;

@@ -13,7 +13,6 @@
 
 namespace json2wav
 {
-	//constexpr const float defaultSweepTime = 0.0075f;
 	constexpr const float defaultSweepTime = 0.005f;
 
 	template<typename ConcreteAudioObject, typename EParamType, EParamType eParamAmp, EParamType eParamFreq, bool bResetOnStart>
@@ -200,12 +199,10 @@ namespace json2wav
 								}
 							}
 						}
-						//this->AddEvent(nextFreqStart, eParamFreq, next->freq, nextSweepTime, ERampShape::LogScaleLinear);
 						this->AddEvent(nextFreqStart, eParamFreq, next->freq, nextSweepTime, ERampShape::LogScaleSCurve);
 					}
 
 					const NoteData& firstNote(*notes.begin());
-					//this->AddEvent(firstNote.start, eParamFreq, firstNote.freq, defaultSweepTime, ERampShape::Linear);
 					this->AddEvent(firstNote.start, eParamFreq, firstNote.freq, defaultSweepTime, ERampShape::SCurve);
 				}
 				[[fallthrough]];
@@ -216,7 +213,6 @@ namespace json2wav
 																// is greater than 1 and, thus, this code has
 																// been reached via fallthrough
 					if (bAddLastFreq)
-						//this->AddEvent(lastnote.start, eParamFreq, lastnote.freq, defaultSweepTime, ERampShape::Linear);
 						this->AddEvent(lastnote.start, eParamFreq, lastnote.freq, defaultSweepTime, ERampShape::SCurve);
 					if (bResetOnStart)
 						this->AddEvent(lastnote.start, eParamAmp, GetResetVal(), 16*sampleRateInv, ERampShape::SCurve);
