@@ -69,9 +69,6 @@ namespace json2wav
 					//static constexpr const float b3 = 0.0f * amp_norm;
 #endif
 
-					//static RNGNorm rng(0.0f, 0.18f);
-					//static RNGNorm rng(0.0f, 0.5f);
-					//static RNG rng(-1.0f, 1.0f);
 					thread_local ThreadSafeStatic<RNG> rng(-1.0f, 1.0f);
 
 					Increment(deltaTime);
@@ -85,7 +82,6 @@ namespace json2wav
 					z3 = z2;
 					z2 = z1;
 					z1 = mid;
-					//buf[i] = smpIn;
 				});
 		}
 

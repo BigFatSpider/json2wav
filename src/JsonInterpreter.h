@@ -141,8 +141,6 @@ namespace json2wav
 				template<typename T> SynthWrapper(SharedPtr<T> ptr)
 					: paudio(ptr)
 					, pcomp(Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr))
-					//, pcomp(Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(
-					//	Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<CompositeSynth>>(ptr, std::move(ptr)), nullptr))
 					, pdrum(Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr))
 					, phit(Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr))
 					, idx(0)
@@ -177,8 +175,6 @@ namespace json2wav
 				{
 					paudio = ptr;
 					pcomp = Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
-					//pcomp = Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(
-					//	Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<CompositeSynth>>(ptr, std::move(ptr)), nullptr);
 					pdrum = Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
 					phit = Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
 
@@ -424,7 +420,6 @@ namespace json2wav
 	public:
 		JsonInterpreter_t(const std::string& nameInit = "music")
 			: mode(nullptr)
-			//: mode(*this)
 			, error(*this), done(*this, &error), top(*this, &done)
 			, meta(*this, &top), mixer(*this, &top), parts(*this, &top)
 			, volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this)
@@ -437,20 +432,11 @@ namespace json2wav
 		{
 			mode = &top;
 			wav.AddInput(mainout->volume);
-
-			/*std::ifstream f("presets.json");
-			if (f)
-			{
-				presetsReader = MakeUnique<JsonInterpreter>(0);
-				JsonParser p;
-				p.parse(f, *presetsReader);
-			}*/
 		}
 
 	private:
 		JsonInterpreter_t(JsonInterpreter_t& parent)
 			: mode(nullptr)
-			//: mode(*this)
 			, error(*this), done(*this, &error), top(*this, &done)
 			, meta(*this, &top), mixer(*this, &top), parts(*this, &top)
 			, volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this)
@@ -970,8 +956,6 @@ namespace json2wav
 				if (this->rthis.partdatas.size() == 0)
 					this->rthis.partdatas.emplace_back();
 				// Otherwise a preset
-				//else
-				//	this->InvalidArrayError();
 			}
 			virtual void OnNextNode(std::string&& nodekey) override
 			{
@@ -1081,9 +1065,6 @@ namespace json2wav
 					SharedPtr<AudioJoin<>> outnode = partdata.outfaders[0];
 					if (partdata.outputs.size() > 1)
 					{
-						//this->error(std::string("AudioMult not tested yet; multiple outputs for part ")
-						//	+ std::to_string(this->rthis.partdatas.size() - 1));
-						//return;
 						partdata.outmult = MakeShared<BasicMult<>>();
 						outnode = partdata.outmult;
 						for (SharedPtr<Fader<>> pfader : partdata.outfaders)
@@ -1161,8 +1142,6 @@ namespace json2wav
 						if (const float partend = endtime + synth->GetRelease(); partend > this->rthis.timelen)
 							this->rthis.timelen = partend;
 					}
-					//else
-					//	this->error("Part must specify an instrument");
 				}
 
 			private:
@@ -1192,7 +1171,6 @@ namespace json2wav
 						this->up();
 						if (!poutput)
 							poutput = this->rthis.mainout;
-						//this->rthis.partdatas.back().outputs.back() = poutput;
 						OnPopNode(poutput);
 						poutput = nullptr;
 					}
@@ -2532,69 +2510,6 @@ namespace json2wav
 							{
 								this->rthis.partdatas.back().outputs.back() = poutput;
 							}
-
-							/*
-						private:
-							virtual void OnPushNode() override
-							{
-								pathidx = 0;
-								poutput = nullptr;
-							}
-							virtual void OnNextNode() override { ++pathidx; }
-							virtual void OnPopNode() override
-							{
-								this->up();
-								if (!poutput)
-									poutput = this->rthis.mainout;
-								this->rthis.partdatas.back().outputs.back() = poutput;
-								poutput = nullptr;
-							}
-							virtual void OnString(std::string&& value) override
-							{
-								if (pathidx > 0)
-								{
-									this->error("Bus path nodes after the first must be numbers");
-									return;
-								}
-
-								if (value == "mixer")
-									poutput = this->rthis.mainout;
-								else
-									this->InvalidStringError(std::move(value));
-							}
-							virtual void OnNumber(double value) override
-							{
-								if (pathidx == 0)
-								{
-									this->error("First bus path node must be a string");
-									return;
-								}
-
-								if (value < 0.0 || ((value - std::floor(value)) != 0.0))
-								{
-									this->error("Bus path indices must be nonnegative integers");
-									return;
-								}
-
-								if (!poutput)
-								{
-									this->error("Output pointer is null");
-									return;
-								}
-
-								const size_t busidx = static_cast<size_t>(value);
-								if (busidx >= poutput->busses.size())
-								{
-									this->error(std::string("Invalid output path index: ") + std::to_string(busidx));
-									return;
-								}
-
-								poutput = poutput->busses[busidx];
-							}
-
-						private:
-							size_t pathidx;
-							SharedPtr<BusData> poutput;*/
 						};
 
 					private:
@@ -4086,19 +4001,6 @@ namespace json2wav
 							}
 							this->rthis.addEffect(std::move(delayptr));
 						}
-						/*switch (paramsSet)
-						{
-						case ParamsFeedback:
-						case ParamsNone: this->error("Must specify delay amount"); break;
-						case ParamsDelay:
-							this->rthis.addEffect(MakeShared<Delay<>>(static_cast<float>(delay))); break;
-						case ParamsDelayFeedback:
-							this->rthis.addEffect(MakeShared<Delay<>>(
-								static_cast<float>(delay),
-								static_cast<float>(feedback),
-								fbt)); break;
-						default: this->error("Invalid effect parameters"); break;
-						}*/
 						break;
 					case EValidFX::Distortion:
 					{
@@ -4106,15 +4008,6 @@ namespace json2wav
 						const int iorder = (paramsSet & ParamOrderBit) ? static_cast<int>(order) : 5;
 						switch (iorder)
 						{
-
-						/*
-						case 2: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 2, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 3: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 3, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 4: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 4, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 5: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 5, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 6: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 6, sampleChunkNum/2, eWaveShaper>>()); break;
-						*/
-
 						case 2: this->rthis.addEffect(MakeShared<ChebyDist<double, 2, sampleChunkNum/2, eWaveShaper>>()); break;
 						case 3: this->rthis.addEffect(MakeShared<ChebyDist<double, 3, sampleChunkNum/2, eWaveShaper>>()); break;
 						case 4: this->rthis.addEffect(MakeShared<ChebyDist<double, 4, sampleChunkNum/2, eWaveShaper>>()); break;
@@ -4130,17 +4023,6 @@ namespace json2wav
 						const int iorder = (paramsSet & ParamOrderBit) ? static_cast<int>(order) : 5;
 						switch (iorder)
 						{
-
-						/*
-						case 2: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 2, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 3: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 3, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 4: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 4, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 5: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 5, sampleChunkNum/2, eWaveShaper>>()); break;
-						case 6: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<ChebyDist<double, 6, sampleChunkNum/2, eWaveShaper>>()); break;
-						*/
-
-						//case 2: this->rthis.addEffect(MakeShared<ChebyDist<double, 2, sampleChunkNum/2, eWaveShaper>>()); break;
-						//case 3: this->rthis.addEffect(MakeShared<ChebyDist<double, 3, sampleChunkNum/2, eWaveShaper>>()); break;
 						case 4: this->rthis.addEffect(MakeShared<ChebyDist<double, 4, sampleChunkNum/2, eWaveShaper>>()); break;
 						case 5: this->rthis.addEffect(MakeShared<ChebyDist<double, 5, sampleChunkNum/2, eWaveShaper>>()); break;
 						case 6: this->rthis.addEffect(MakeShared<ChebyDist<double, 6, sampleChunkNum/2, eWaveShaper>>()); break;
@@ -4393,203 +4275,8 @@ namespace json2wav
 			InterpreterMode* mode;
 		};
 
-		// TODO: Implement this if it doesn't seem too complicated
-		/*class PresetHandler
-		{
-		public:
-			using mode_type = Utility::TypeIf_t<bLog, ModeLogger, InterpreterMode*>;
-
-		public:
-			PresetHandler(JsonInterpreter& rthisInit) : rthis(rthisInit), walker(rthisInit) {}
-			PresetHandler& operator=(InterpreterMode* modeSet)
-			{
-				walker = modeSet;
-				return *this;
-			}
-			operator InterpreterMode*() { return static_cast<InterpreterMode*>(walker); }
-
-			IJsonWalker* operator->()
-			{
-				return &walker;
-			}
-
-			const IJsonWalker* operator->() const
-			{
-				return &walker;
-			}
-
-			IJsonWalker& operator*()
-			{
-				return walker;
-			}
-
-			const IJsonWalker& operator*() const
-			{
-				return walker;
-			}
-
-		private:
-			class Walker : public IJsonWalker
-			{
-			public:
-				Walker(JsonInterpreter& rthisInit)
-					: rthis(rthisInit)
-					, mode(nullptr), setting(false), waiting(false), pushonnext(false), consumename(false), depth(0)
-				{
-				}
-				Walker& operator=(InterpreterMode* modeSet)
-				{
-					mode = modeSet;
-					if (!setting && mode->CanPreset())
-					{
-						setting = true;
-						waiting = false;
-						pushonnext = false;
-						consumename = false;
-						depth = 0;
-					}
-					return *this;
-				}
-				operator InterpreterMode*() { return static_cast<InterpreterMode*>(mode); }
-
-				virtual void OnPushNode(std::string&& nodekey) override
-				{
-					if (setting)
-					{
-						if (++depth == 1)
-							if (OnNode(nodekey))
-								pushonnext = true;
-					}
-					if (consumename)
-					{
-					}
-					if (!pushonnext)
-						mode->OnPushNode(std::move(nodekey));
-				}
-				virtual void OnPushNode() override
-				{
-					if (setting)
-						waiting = true;
-					if (consumename)
-					{
-					}
-					mode->OnPushNode();
-				}
-				virtual void OnNextNode(std::string&& nodekey) override
-				{
-					if (setting && depth == 1 && OnNode(nodekey))
-						return;
-					if (pushonnext)
-					{
-						mode->OnPushNode(std::move(nodekey));
-						pushonnext = false;
-					}
-					else
-						mode->OnNextNode(std::move(nodekey));
-				}
-				virtual void OnNextNode() override
-				{
-					mode->OnNextNode();
-				}
-				virtual void OnPopNode() override
-				{
-					if (setting)
-					{
-						if (waiting)
-							waiting = false;
-						else if (--depth == 0)
-						{
-							setting = false;
-						}
-					}
-					mode->OnPopNode();
-				}
-				virtual void OnString(std::string&& value) override
-				{
-					if (setting)
-					{
-						if (waiting)
-						{
-							waiting = false;
-							++depth;
-						}
-					}
-					if (consumename)
-					{
-						presetname = std::move(value);
-						consumename = false;
-					}
-					else
-						mode->OnString(std::move(value));
-				}
-				virtual void OnNumber(double value) override
-				{
-					if (setting && waiting)
-					{
-						waiting = false;
-						++depth;
-					}
-					if (consumename)
-					{
-					}
-					mode->OnNumber(value);
-				}
-				virtual void OnBool(bool value) override
-				{
-					if (setting && waiting)
-					{
-						waiting = false;
-						++depth;
-					}
-					if (consumename)
-					{
-					}
-					mode->OnBool(value);
-				}
-				virtual void OnNull() override
-				{
-					if (setting && waiting)
-					{
-						waiting = false;
-						++depth;
-					}
-					if (consumename)
-					{
-					}
-					mode->OnNull();
-				}
-
-				bool OnNode(const std::string& nodekey)
-				{
-					if (nodekey == "preset")
-					{
-						consumename = true;
-						return true;
-					}
-					return false;
-				}
-
-			private:
-				JsonInterpreter& rthis;
-				mode_type mode;
-				bool setting;
-				bool waiting;
-				bool pushonnext;
-				bool consumename;
-				size_t depth;
-				std::string presetname;
-			};
-
-		private:
-			JsonInterpreter& rthis;
-			Walker walker;
-		};*/
-
 	private:
-		//InterpreterMode* mode;
-		//ModeLogger mode;
 		Utility::TypeIf_t<bLog, ModeLogger, InterpreterMode*> mode;
-		//PresetHandler mode;
 		Vector<std::pair<InterpreterMode*, std::function<void(void*)>>> modestack;
 		Error error;
 		Done done;
@@ -4619,8 +4306,6 @@ namespace json2wav
 		SharedPtr<BusData> currentbus;
 		std::function<void(SharedPtr<AudioJoin<>>)> addEffect;
 		bool bIsChild;
-		//std::unordered_map<std::string, std::unordered_map<std::string, PartData*>> presets;
-		//UniquePtr<JsonInterpreter> presetsReader;
 	};
 
 	template<bool bLog>

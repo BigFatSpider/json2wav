@@ -95,13 +95,11 @@ namespace json2wav::math
 			inline SquareMatrix& operator+=(const DiagonalMatrix<n, T>& other);
 			inline SquareMatrix& operator-=(const DiagonalMatrix<n, T>& other);
 
-			//T (& operator[](size_t i))[n]
 			row_t& operator[](size_t i)
 			{
 				return data[i];
 			}
 
-			//const T (& operator[](size_t i) const)[n]
 			const_row_t& operator[](size_t i) const
 			{
 				return data[i];
@@ -123,8 +121,6 @@ namespace json2wav::math
 
 			SquareMatrix& operator*=(const SquareMatrix& rhs)
 			{
-				//return *this=*this*rhs; // Bahaha
-				//return *this=rhs**this; // Bahahahahahaha
 				const SquareMatrix& lhs = *this;
 				*this = lhs*rhs;
 				return *this;
@@ -132,8 +128,6 @@ namespace json2wav::math
 
 			SquareMatrix& operator*=(const DiagonalMatrix<n, T>& rhs)
 			{
-				//return *this=*this*rhs; // Bahaha
-				//return *this=rhs**this; // Bahahahahahaha
 				const SquareMatrix& lhs = *this;
 				*this = lhs*rhs;
 				return *this;
@@ -170,21 +164,6 @@ namespace json2wav::math
 							return false;
 				return true;
 			}
-
-			/*bool IsOrthonormal() const
-			{
-				if (!IsOrthogonal())
-					return false;
-				for (size_t i = 0; i < n; ++i)
-				{
-					T magsq = static_cast<T>(0);
-					for (size_t j = 0; j < n; ++j)
-						magsq += data[i][j]*data[i][j];
-					if (std::abs(std::sqrt(magsq) - static_cast<T>(1)) >= GetTolerance<T>())
-						return false;
-				}
-				return true;
-			}*/
 
 		private:
 			T data[n][n];
