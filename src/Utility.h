@@ -170,19 +170,12 @@ namespace json2wav
 			};
 			template<size_t floatsize> using FloatTypeBySize = typename FloatTypeBySizeStruct<floatsize>::type;
 			template<typename T> using GetFloatType = std::conditional_t<std::is_floating_point_v<T>, T, FloatTypeBySize<sizeof(T)>>;
-
-			/*template<bool bIsFloat, typename T>
-			inline GetFloatType<T> DBToGain(const T inDB)
-			{
-				return DBToGain(static_cast<GetFloatType<T>>(inDB));
-			}*/
 		}
 
 		template<typename T>
 		inline detail::GetFloatType<T> DBToGain(const T inDB)
 		{
 			return detail::DBToGain(static_cast<detail::GetFloatType<T>>(inDB));
-			//return detail::DBToGain<std::is_floating_point_v<T>>(inDB);
 		}
 
 		template<> inline float DBToGain<float>(const float inDB) { return detail::DBToGain(inDB); }
@@ -406,62 +399,6 @@ namespace json2wav
 
 			return static_cast<T>(y);
 		}
-
-#if 0
-		template<typename T>
-		inline T uintlog2(T v)
-		{
-			static_assert(false, "json2wav::uintlog2() hasn't been tested");
-			static_assert(std::is_unsigned_v<T>, "json2wav::uintlog2() only works on unsigned integers");
-			T v;
-			T r;
-			T shift;
-			if constexpr (sizeof(T) == 8)
-			{
-				r = (v > 0xffffffff) << 5;
-				v >>= r;
-				shift = (v > 0xffff) << 4;
-				v >>= shift;
-				r |= shift;
-				shift = (v > 0xff) << 3;
-				v >>= shift;
-				r |= shift;
-				shift = (v > 0xf) << 2;
-				v >>= shift;
-				r |= shift;
-			}
-			else if constexpr (sizeof(T) == 4)
-			{
-				r = (v > 0xffff) << 4;
-				v >>= r;
-				shift = (v > 0xff) << 3;
-				v >>= shift;
-				r |= shift;
-				shift = (v > 0xf) << 2;
-				v >>= shift;
-				r |= shift;
-			}
-			else if constexpr (sizeof(T) == 2)
-			{
-				r = (v > 0xff) << 3;
-				v >>= r;
-				shift = (v > 0xf) << 2;
-				v >>= shift;
-				r |= shift;
-			}
-			else
-			{
-				r = (v > 0xf) << 2;
-				v >>= r;
-			}
-			shift = (v > 0x3) << 1;
-			v >>= shift;
-			r |= shift;
-			r |= (v >> 1);
-			return r;
-		}
-#endif
-
 	}
 }
 

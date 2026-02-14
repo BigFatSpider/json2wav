@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <cstdint>
 #include <cmath>
-//#include <atomic>
 
 #define DEBUG_PWMAGE 0
 
@@ -131,10 +130,8 @@ namespace json2wav
 			, output(other.output)
 
 			, saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3]
-				//, other.saw_prev[4], other.saw_prev[5], other.saw_prev[6]
 				}
 			, pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3]
-				//, other.pmsaw_prev[4], other.pmsaw_prev[5], other.pmsaw_prev[6]
 				}
 		{
 		}
@@ -156,10 +153,8 @@ namespace json2wav
 			, output(0.0f)
 
 			, saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3]
-				//, other.saw_prev[4], other.saw_prev[5], other.saw_prev[6]
 				}
 			, pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3]
-				//, other.pmsaw_prev[4], other.pmsaw_prev[5], other.pmsaw_prev[6]
 				}
 		{
 		}
@@ -207,16 +202,10 @@ namespace json2wav
 				saw_prev[1] = other.saw_prev[1];
 				saw_prev[2] = other.saw_prev[2];
 				saw_prev[3] = other.saw_prev[3];
-				//saw_prev[4] = other.saw_prev[4];
-				//saw_prev[5] = other.saw_prev[5];
-				//saw_prev[6] = other.saw_prev[6];
 				pmsaw_prev[0] = other.pmsaw_prev[0];
 				pmsaw_prev[1] = other.pmsaw_prev[1];
 				pmsaw_prev[2] = other.pmsaw_prev[2];
 				pmsaw_prev[3] = other.pmsaw_prev[3];
-				//pmsaw_prev[4] = other.pmsaw_prev[4];
-				//pmsaw_prev[5] = other.pmsaw_prev[5];
-				//pmsaw_prev[6] = other.pmsaw_prev[6];
 			}
 			return *this;
 		}
@@ -258,16 +247,10 @@ namespace json2wav
 			saw_prev[1] = other.saw_prev[1];
 			saw_prev[2] = other.saw_prev[2];
 			saw_prev[3] = other.saw_prev[3];
-			//saw_prev[4] = other.saw_prev[4];
-			//saw_prev[5] = other.saw_prev[5];
-			//saw_prev[6] = other.saw_prev[6];
 			pmsaw_prev[0] = other.pmsaw_prev[0];
 			pmsaw_prev[1] = other.pmsaw_prev[1];
 			pmsaw_prev[2] = other.pmsaw_prev[2];
 			pmsaw_prev[3] = other.pmsaw_prev[3];
-			//pmsaw_prev[4] = other.pmsaw_prev[4];
-			//pmsaw_prev[5] = other.pmsaw_prev[5];
-			//pmsaw_prev[6] = other.pmsaw_prev[6];
 
 			return *this;
 		}
@@ -358,8 +341,6 @@ namespace json2wav
 			, center(0.3)
 			, bStateInitialized(false)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			//, crackle{ 0 }
-			//, crackre{ 0 }
 			, crackle(history_size, 0)
 			, crackre(history_size, 0)
 			, cracklepos(0)
@@ -377,8 +358,6 @@ namespace json2wav
 			, center(other.center)
 			, bStateInitialized(other.bStateInitialized)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			//, crackle{ 0 }
-			//, crackre{ 0 }
 			, crackle(other.crackle)
 			, crackre(other.crackre)
 			, cracklepos(other.cracklepos)
@@ -388,14 +367,6 @@ namespace json2wav
 			, chistory(other.chistory)
 #endif
 		{
-			//for (unsigned int i = 0; i < history_size; ++i)
-			//{
-				//crackle[i] = other.crackle[i];
-				//crackre[i] = other.crackre[i];
-				//lhistory[i] = other.lhistory[i];
-				//rhistory[i] = other.rhistory[i];
-				//chistory[i] = other.chistory[i];
-			//}
 		}
 
 		PWMage(PWMage&& other) noexcept
@@ -404,8 +375,6 @@ namespace json2wav
 			, center(other.center)
 			, bStateInitialized(other.bStateInitialized)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			//, crackle{ 0 }
-			//, crackre{ 0 }
 			, crackle(std::move(other.crackle))
 			, crackre(std::move(other.crackre))
 			, cracklepos(other.cracklepos)
@@ -415,14 +384,6 @@ namespace json2wav
 			, chistory(std::move(other.chistory))
 #endif
 		{
-			//for (unsigned int i = 0; i < history_size; ++i)
-			//{
-				//crackle[i] = other.crackle[i];
-				//crackre[i] = other.crackre[i];
-				//lhistory[i] = other.lhistory[i];
-				//rhistory[i] = other.rhistory[i];
-				//chistory[i] = other.chistory[i];
-			//}
 		}
 
 		PWMage& operator=(const PWMage& other)
@@ -435,14 +396,6 @@ namespace json2wav
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
 				cracklepos = other.cracklepos;
 				nsamplesgot = other.nsamplesgot;
-				//for (unsigned int i = 0; i < history_size; ++i)
-				//{
-					//crackle[i] = other.crackle[i];
-					//crackre[i] = other.crackre[i];
-					//lhistory[i] = other.lhistory[i];
-					//rhistory[i] = other.rhistory[i];
-					//chistory[i] = other.chistory[i];
-				//}
 				crackle = other.crackle;
 				crackre = other.crackre;
 				lhistory = other.lhistory;
@@ -463,14 +416,6 @@ namespace json2wav
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
 				cracklepos = other.cracklepos;
 				nsamplesgot = other.nsamplesgot;
-				//for (unsigned int i = 0; i < history_size; ++i)
-				//{
-					//crackle[i] = other.crackle[i];
-					//crackre[i] = other.crackre[i];
-					//lhistory[i] = other.lhistory[i];
-					//rhistory[i] = other.rhistory[i];
-					//chistory[i] = other.chistory[i];
-				//}
 				crackle = std::move(other.crackle);
 				crackre = std::move(other.crackre);
 				lhistory = std::move(other.lhistory);
@@ -514,7 +459,6 @@ namespace json2wav
 						if constexpr ((eChanMask & EPWMageChanMask::Mono) == EPWMageChanMask::Mono)
 						{
 							pwC = math::f32::sq2inv*GenPWMSquare(deltaTime, freqnow, phasenow, 0.0, pwnow, pwmnow, pwStates[PWMageChannels<eChanMask>::cidx]);
-							//pwC = math::f32::sq2inv*GenPWMSquare(deltaTime, freqnow, phasenow, one_third, pwnow, pwmnow, pwStates[PWMageChannels<eChanMask>::cidx]);
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
 							ccap = pwStates[PWMageChannels<eChanMask>::cidx];
 							ccap.output = pwC;
@@ -1153,45 +1097,6 @@ namespace json2wav
 								f << chistory[idx].pmsaw_smpm1 << ',';
 								f << chistory[idx].pwmsq_smpm1 << ',';
 								f << '\n';
-
-								/*
-								f << lhistory[idx].saw_prev[0] << ',';
-								f << lhistory[idx].saw_prev[1] << ',';
-								f << lhistory[idx].saw_prev[2] << ',';
-								f << lhistory[idx].pmsaw_prev[0] << ',';
-								f << lhistory[idx].pmsaw_prev[1] << ',';
-								f << lhistory[idx].pmsaw_prev[2] << ',';
-
-								f << rhistory[idx].freqm2 << ',';
-								f << rhistory[idx].phasem2 << ',';
-								f << rhistory[idx].pwm2 << ',';
-								f << rhistory[idx].pwmm2 << ',';
-								f << rhistory[idx].pmphasem2 << ',';
-								f << rhistory[idx].pmsaw_instaphase << ',';
-								f << rhistory[idx].pmsaw_instafreq << ',';
-								f << rhistory[idx].saw_prev[0] << ',';
-								f << rhistory[idx].saw_prev[1] << ',';
-								f << rhistory[idx].saw_prev[2] << ',';
-								f << rhistory[idx].pmsaw_prev[0] << ',';
-								f << rhistory[idx].pmsaw_prev[1] << ',';
-								f << rhistory[idx].pmsaw_prev[2] << ',';
-
-								f << chistory[idx].freqm2 << ',';
-								f << chistory[idx].phasem2 << ',';
-								f << chistory[idx].pwm2 << ',';
-								f << chistory[idx].pwmm2 << ',';
-								f << chistory[idx].pmphasem2 << ',';
-								f << chistory[idx].pmsaw_instaphase << ',';
-								f << chistory[idx].pmsaw_instafreq << ',';
-								f << chistory[idx].saw_prev[0] << ',';
-								f << chistory[idx].saw_prev[1] << ',';
-								f << chistory[idx].saw_prev[2] << ',';
-								f << chistory[idx].pmsaw_prev[0] << ',';
-								f << chistory[idx].pmsaw_prev[1] << ',';
-								f << chistory[idx].pmsaw_prev[2];
-
-								f << '\n';
-								*/
 							}
 
 						}
@@ -1291,7 +1196,6 @@ namespace json2wav
 			double pwmsq_pmphase = pwmsq_pmphasem1 + 0.5*pwmsq_w;
 			pwmsq_pmphase -= std::floor(pwmsq_pmphase);
 
-			//const double saw_instaphase = pwmsq_phase;
 			const double modamp = (0.5 - std::abs(pwmsq_pw - 0.5))*pwmsq_pwm;
 			double saw_instaphase = pwmsq_phase + pwmsq_phaseoffset;
 			saw_instaphase -= std::floor(saw_instaphase);
@@ -1303,25 +1207,9 @@ namespace json2wav
 			const double pmsaw_smp = quablepsaw(pmsaw_instafreq, pmsaw_instaphase, pwmsq_state.pmsaw_prev);
 			const double pwmsq_smp = saw_smp - pmsaw_smp;
 
-			//static std::atomic<unsigned int> count = 0;
-			//if (++count <= 5000)
-				//std::cout << "pwmsq_wm1 = " << pwmsq_wm1 << ", pmsaw_instafreqm1 = " << pmsaw_instafreqm1 << '\n' <<
-					//"pwmsq_w = " << pwmsq_w << ", pmsaw_instafreq = " << pmsaw_instafreq << '\n';
-
 			double dsinput[2] = { pwmsq_smpm1, pwmsq_smp };
 			double output[1] = { 0.0 };
 			pwmsq_state.ds.process(dsinput, output);
-
-			/*{
-				downsampler441_x2<double> ds;
-				float freqm2;
-				double phasem2;
-				double pwm2;
-				double pwmm2;
-				double pmphasem2;
-				double saw_prev[3];
-				double pmsaw_prev[3];
-			}*/
 
 			pwmsq_state.freqm2 = pwmsq_freq;
 			pwmsq_state.phasem2 = pwmsq_phase;
@@ -1355,104 +1243,18 @@ namespace json2wav
 #endif
 
 			return static_cast<float>(output[0]);
-
-			/*
-
-				def naivepbla(x):
-					return msixth + x - x*x
-
-				def naivequartic(x):
-					return threesixtieth + mtwelveth*x*x*(1.0 + x*(-2.0 + x))
-
-				def postquablep(w, x):
-					binom = 1.0 - x
-					wbinom = w*binom
-					wbinom2 = wbinom*binom
-					return sixtieth*wbinom*wbinom2*wbinom2
-
-				def prequablep(w, x):
-					binom = 1.0 + x
-					wbinom = w*binom
-					wbinom2 = wbinom*binom
-					return sixtieth*wbinom*wbinom2*wbinom2
-
-				def quablep(w, x):
-					if x < w:
-						return postquablep(w, x/w)
-					elif x > 1.0 - w:
-						return prequablep(w, (x - 1.0)/w)
-					return floattype(0.0)
-
-				def quartic(w, x):
-					return twelveth*w*w*naivepbla(x) + naivequartic(x) + quablep(w, x)
-
-				def quablepsaw(w, x, yprev):
-					winv = 1.0/w
-					y3 = quartic(w, x)
-					y2 = (y3 - yprev[3])*winv
-					y1 = (y2 - yprev[2])*winv
-					y0 = (y1 - yprev[1])*winv
-					return y0, [y0, y1, y2, y3]
-
-				x = 0.0
-				w = f/sr
-				winv = sr/f
-
-				y3prev = quartic(w, mod1(x - w))
-				y3prev2 = quartic(w, mod1(x - 2.0*w))
-				y3prev3 = quartic(w, mod1(x - 3.0*w))
-				y2prev = (y3prev - y3prev2)*winv
-				y2prev2 = (y3prev2 - y3prev3)*winv
-				y1prev = (y2prev - y2prev2)*winv
-				yprev = [0.0, y1prev, y2prev, y3prev]
-
-				pharg = floattype(0.0)
-				y = [floattype(0.0)] * nsamples
-				for n in range(nsamples):
-					phase = mod1(x - pm*np.sin(tau*pharg))
-					freq = w - pm*pi*w*np.cos(tau*pharg)
-					y[n], yprev = quablepsaw(freq, phase, yprev)
-					x = phasor(w, x)
-					pharg = phasor(0.5*w, pharg)
-
-			*/
-
 		}
 
 		static double quablepsaw(const double w, const double p, double (&prev)[4])
 		{
-			//const double winv = 1.0/w;
 			const double winv = 0.7937/w; // Cube root of 1/2
-			//const double winv = 0.39685/w; // Cube root of 1/16
 			const double y4 = quartic(w, p);
-			//const double y7 = quartic(w, p);
-
-			//const double y6 = y7 + prev[6]; // No Nyquist
-			//const double y5 = (y6 - prev[5])*winv;
-			//const double y4 = y5 + prev[4]; // No Nyquist
-			//const double y3 = (y4 - prev[3])*winv;
-			//const double y2 = y3 + prev[2]; // No Nyquist
-			//const double y1 = (y2 - prev[1])*winv;
-			//const double y0 = y1 + prev[0]; // No Nyquist
 
 			const double y3 = y4 + prev[3]; // No Nyquist
 			const double y2 = (y3 - prev[2])*winv;
 			const double y1 = (y2 - prev[1])*winv;
 			const double y0 = (y1 - prev[0])*winv;
 
-			//const double y3 = (y4 + prev[3])*winv; // No Nyquist
-			//const double y2 = (y3 - prev[2])*winv;
-			//const double y1 = (y2 - prev[1])*winv;
-			//const double y0 = y1 - prev[0];
-
-			//const double y3 = (y4 - prev[3])*winv;
-			//const double y2 = (y3 - prev[2])*winv;
-			//const double y1 = (y2 - prev[1])*winv;
-			//const double y0 = y1 + prev[0]; // No Nyquist
-
-			//prev[6] = y7;
-			//prev[5] = y6;
-			//prev[4] = y5;
 			prev[3] = y4;
 			prev[2] = y3;
 			prev[1] = y2;
@@ -1523,15 +1325,10 @@ namespace json2wav
 		PWMSquareState pwStates[PWMageChannels<eChanMask>::size];
 		bool bStateInitialized;
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-		//float crackle[history_size];
-		//float crackre[history_size];
 		Vector<float> crackle;
 		Vector<float> crackre;
 		size_t cracklepos;
 		size_t nsamplesgot;
-		//PWMSquareStateCapture lhistory[history_size];
-		//PWMSquareStateCapture rhistory[history_size];
-		//PWMSquareStateCapture chistory[history_size];
 		Vector<PWMSquareStateCapture> lhistory;
 		Vector<PWMSquareStateCapture> rhistory;
 		Vector<PWMSquareStateCapture> chistory;
