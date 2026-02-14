@@ -3,7 +3,6 @@
 #pragma once
 
 #include "OversamplerFilters.h"
-//#include <iostream>
 #include <cstddef>
 
 namespace json2wav::oversampling
@@ -72,7 +71,6 @@ namespace json2wav::oversampling
 		const insample_t* const inbuf, // size n
 		const size_t instride,
 		outsample_t (&prevbuf)[n], // size n
-		//const sample_t (&filt)[n << 1], // size 2n
 		const filts::filt_t<outsample_t, n << 1>& filt,
 		outsample_t* const outbuf, // size 2n
 		const size_t outstride,
@@ -117,7 +115,6 @@ namespace json2wav::oversampling
 		const sample_t* const inbuf, // size n
 		const size_t instride,
 		sample_t (&prevbuf)[n], // size n
-		//const sample_t (&filthb)[n], // size n
 		const filts::filthb_t<sample_t, n>& filthb,
 		sample_t* const outbuf, // size 2n
 		const size_t outstride,
@@ -174,7 +171,6 @@ namespace json2wav::oversampling
 		const insample_t* const inbuf, // size 2n
 		const size_t instride,
 		insample_t (&prevbuf)[twon], // size 2n
-		//const sample_t (&filt)[twon], // size 2n
 		const filts::filt_t<insample_t, twon>& filt,
 		outsample_t* const outbuf, // size n
 		const size_t outstride,
@@ -220,7 +216,6 @@ namespace json2wav::oversampling
 		const sample_t* const inbuf, // size 2n
 		const size_t instride,
 		sample_t (&prevbuf)[n << 1], // size 2n
-		//const sample_t (&filthb)[n], // size n
 		const filts::filthb_t<sample_t, n>& filthb,
 		sample_t* const outbuf, // size n
 		const size_t outstride,
@@ -283,7 +278,6 @@ namespace json2wav::oversampling
 		const sample_t* const inbuf, // size n
 		const size_t instride,
 		sample_t (&prevbuf)[n], // size n
-		//const sample_t (&filt)[n], // size n
 		const filts::filt_t<sample_t, n>& filt,
 		sample_t* const outbuf, // size n
 		const size_t outstride,
@@ -321,68 +315,6 @@ namespace json2wav::oversampling
 			prevbuf[nprev + i] = intmp[i];
 
 	}
-
-#if 0
-	template<typename sample_t>
-	class oversampler441_x2
-	{
-	private:
-		sample_t buf1to2[128];
-		sample_t buf2to1[256];
-	};
-
-	template<typename sample_t>
-	class oversampler441_x4
-	{
-	private:
-		sample_t buf1to2[128];
-		sample_t buf2to4[24];
-		sample_t buf4to2[48];
-		sample_t buf2to1[256];
-	};
-
-	template<typename sample_t>
-	class oversampler441_x8
-	{
-	private:
-		sample_t buf1to2[128];
-		sample_t buf2to4[24];
-		sample_t buf4to8[16];
-		sample_t buf8to4[32];
-		sample_t buf4to2[48];
-		sample_t buf2to1[256];
-	};
-
-	template<typename sample_t>
-	class oversampler441_x16
-	{
-	private:
-		sample_t buf1to2[128];
-		sample_t buf2to4[24];
-		sample_t buf4to8[16];
-		sample_t buf8to16[16];
-		sample_t buf16to8[32];
-		sample_t buf8to4[32];
-		sample_t buf4to2[48];
-		sample_t buf2to1[256];
-	};
-
-	template<typename sample_t>
-	class oversampler441_x32
-	{
-	private:
-		sample_t buf1to2[128];
-		sample_t buf2to4[24];
-		sample_t buf4to8[16];
-		sample_t buf8to16[16];
-		sample_t buf16to32[16];
-		sample_t buf32to16[32];
-		sample_t buf16to8[32];
-		sample_t buf8to4[32];
-		sample_t buf4to2[48];
-		sample_t buf2to1[256];
-	};
-#endif
 
 	template<typename sample_t>
 	class upsampler441_x2
@@ -1357,6 +1289,5 @@ namespace json2wav::oversampling
 		sample_t buf4to2[48];
 		sample_t buf2to1[256];
 	};
-
 }
 

@@ -56,17 +56,6 @@ namespace json2wav
 					const float detuneLo(-0.5f*freqSpreadCents);
 					const float detuneInt(freqSpreadCents/(static_cast<float>(unison - 1)));
 
-					/*for (size_t i = 0; i < unison; ++i)
-						detunes.push_back(detuneLo + i*detuneInt);
-
-					// Swap every other with its mirror from the end to prevent pitch "sagging" to one side
-					for (size_t i = 1, end = unison / 2; i < end; i += 2)
-					{
-						const float tmp(detunes[i]);
-						detunes[i] = detunes[unison - 1 - i];
-						detunes[unison - 1 - i] = tmp;
-					}*/
-
 					RNG r(detuneLo, (unison - 1)*detuneInt);
 					for (size_t i = 0; i < unison; ++i)
 						detunes.push_back(r());
@@ -85,8 +74,6 @@ namespace json2wav
 				{
 					const double phaseLo(0.5 - 0.5*phaseSpread);
 					const double phaseInt(phaseSpread/(static_cast<double>(unison - 1)));
-					//for (size_t i = 0; i < unison; ++i)
-					//	phases.push_back(phaseLo + i*phaseInt);
 
 					RNG64 r(phaseLo, (unison - 1)*phaseInt);
 					for (size_t i = 0; i < unison; ++i)
@@ -127,8 +114,6 @@ namespace json2wav
 			{
 				if constexpr (bWithSaw)
 				{
-					//Vector<InfiniSaw::Jump> jumps{ InfiniSaw::Jump(phases[i], 1.0f) };
-					//outSaws.emplace_back(compSynth->AddSynthPtrNoRouting<SawType>(ampEnvLo, std::move(jumps), 0.0f, 0.0f));
 					outSaws.emplace_back(compSynth->AddSynthPtrNoRouting<SawType>(ampEnvLo, 154.0f, 0.0f, phases[i]));
 					outSaws[i]->SetDetuneFactor(std::pow(2.0f, detunes[i]*centsTo8ve));
 				}
