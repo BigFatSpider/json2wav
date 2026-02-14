@@ -216,8 +216,6 @@ namespace json2wav
 			CompressorChannel ch;
 			ch.SetParams(testParams);
 
-			//void Process(double* const scbuf, Sample* const iobuf, const size_t bufSize, const unsigned long sampleRate)
-
 			Vector<double> scbuf;
 			Vector<Sample> iobuf;
 			Vector<double> gcbuf;
@@ -256,7 +254,6 @@ namespace json2wav
 		class GainComputer
 		{
 		public:
-			//GainComputer() : xm1(0), xm2(0), um1(0), xum1(0), dum1(0), dxum1(0), bSmallDx(true), dx2m1(0.0) {}
 			GainComputer() : xm1(0), um1(0) {}
 			GainComputer(const GainComputer&) noexcept = default;
 			GainComputer(GainComputer&&) noexcept = default;
@@ -280,10 +277,8 @@ namespace json2wav
 				return du/dx;
 			}
 
-			double Compute(const double x,
-				double (&aout)[6])
+			double Compute(const double x, double (&aout)[6])
 			{
-#if 1
 				// ADAA1
 				static constexpr const double tol2 = 0.00000001;
 				const double y = G(0.5*(x + xm1));
@@ -300,95 +295,6 @@ namespace json2wav
 				if (dx*dx < tol2)
 					return y - 1.0;
 				return du/dx;
-#endif
-
-
-#if 0
-				static constexpr const double third = 1.0/3.0;
-				static constexpr const double tol2 = 0.0001;
-				double first_term = 0.0;
-				double second_term = 0.0;
-				double dx2 = x - xm1;
-				dx2 *= dx2;
-
-				const double first_term_direct = 0.5*G((x + xm1+xm1)*third);
-				const double second_term_direct = 0.5*G((xm2 + xm1+xm1)*third);
-
-				double a[2];
-				a[0] = U(std::abs(x));
-				a[1] = -a[0];
-				const double u0 = a[x < 0.0];
-				a[0] = XU(std::abs(x));
-				a[1] = -a[0];
-				const double xu0 = a[x < 0.0];
-				a[0] = U(std::abs(xm1));
-				a[1] = -a[0];
-				const double u1 = a[xm1 < 0.0];
-				a[0] = XU(std::abs(xm1));
-				a[1] = -a[0];
-				const double xu1 = a[xm1 < 0.0];
-				a[0] = U(std::abs(xm2));
-				a[1] = -a[0];
-				const double u2 = a[xm2 < 0.0];
-				a[0] = XU(std::abs(xm2));
-				a[1] = -a[0];
-				const double xu2 = a[xm2 < 0.0];
-
-				const double first_term_adaa = (x*(u0 - u1) - (xu0 - xu1))/dx2 + 0.5;
-				const double second_term_adaa = (xm2*(u2 - u1) - (xu2 - xu1))/dx2m1 + 0.5;
-
-				first_term = (dx2 < tol2) ? first_term_direct : first_term_adaa;
-				second_term = (dx2m1 < tol2) ? second_term_direct : second_term_adaa;
-
-				dx2m1 = dx2;
-				xm2 = xm1;
-				xm1 = x;
-
-				aout[0] = u0;
-				aout[1] = xu0;
-				aout[2] = first_term_direct;
-				aout[3] = second_term_direct;
-				aout[4] = first_term_adaa;
-				aout[5] = second_term_adaa;
-
-				return first_term + second_term;
-#endif
-
-
-
-
-
-#if 0
-				double y = (bSmallDx) ? 0.5*G((xm2 + xm1+xm1)*third) : dxum1 - xm2*dum1;
-				const double absx = std::abs(x);
-				double au[2] = { U(absx) };
-				double axu[2] = { XU(absx) };
-				au[1] = -au[0];
-				axu[1] = -axu[0];
-				const int bxneg = x < 0.0;
-				const double u = au[bxneg];
-				const double xu = axu[bxneg];
-				double dxsqinv = x - xm1;
-				dxsqinv *= dxsqinv;
-				bSmallDx = dxsqinv < 0.01;
-				if (bSmallDx)
-				{
-					y += 0.5*G((x + xm1+xm1)*third);
-				}
-				else
-				{
-					dxsqinv = 1.0/dxsqinv;
-					dum1 = (u - um1)*dxsqinv;
-					dxum1 = (xu - xum1)*dxsqinv;
-					y += x*dum1 - dxum1;
-				}
-				um1 = u;
-				xum1 = xu;
-				xm2 = xm1;
-				xm1 = x;
-				return y;
-#endif
-
 			}
 
 			void SetParams(const double threshold_db, const double ratio, const double knee_db)
@@ -498,24 +404,18 @@ namespace json2wav
 			double U(const double x)
 			{
 				if (x <= T_k1)
-					//return x;
 					return 0.0;
 				if (x <= T_k2)
-					//return U_k(x) + U_knee_offset;
 					return U_k(x) - x + U_knee_offset;
-				//return U_c(x) + U_comp_offset;
 				return U_c(x) - x + U_comp_offset;
 			}
 
 			double XU(const double x)
 			{
 				if (x <= T_k1)
-					//return ln10inv()*x;
 					return 0.0;
 				if (x <= T_k2)
-					//return XU_k(x) + XU_knee_offset;
 					return XU_k(x) - ln10inv()*x + XU_knee_offset;
-				//return XU_c(x) + XU_comp_offset;
 				return XU_c(x) - ln10inv()*x + XU_comp_offset;
 			}
 
@@ -541,13 +441,6 @@ namespace json2wav
 			}
 
 		private:
-			//double T;
-			//double R;
-			//double K;
-			//double b;
-			//double c;
-			//double d;
-
 			// Cached calculations from parameters
 			double T_k1;
 			double T_k2;
@@ -570,13 +463,7 @@ namespace json2wav
 
 			// DSP state
 			double xm1;
-			//double xm2;
 			double um1;
-			//double xum1;
-			//double dum1;
-			//double dxum1;
-			//bool bSmallDx;
-			//double dx2m1;
 		};
 
 		class CompressorChannel
@@ -604,21 +491,11 @@ namespace json2wav
 				rt2 = paramsToSet.releaseSamples*2.0;
 				dryVolume = (paramsToSet.dryVolume_db > -100.0f) ? Utility::DBToGain(paramsToSet.dryVolume_db) : 0.0f;
 				pEnvelopeFilter = (paramsToSet.df2) ? df2() : tdf2();
-
-#if 0
-				gc.SetParams(paramsToSet.threshold_db, paramsToSet.ratio, paramsToSet.knee_db);
-				const double ar1 = paramsToSet.attackSamples + paramsToSet.releaseSamples + 1.0;
-				vm1 = 0.5*std::sqrt(ar1*ar1 - 1.0);
-				b = std::sqrt(1.0 + 0.5*paramsToSet.releaseSamples);
-				at2 = paramsToSet.attackSamples*2.0;
-				rt2 = paramsToSet.releaseSamples*2.0;
-#endif
 			}
 
 			void Process(double* const scbuf, Sample* const iobuf, const size_t bufSize, const unsigned long sampleRate,
 				double* const gcbuf = nullptr, double* const tabuf = nullptr, double* const gebuf = nullptr)
 			{
-				//void process_unsafe(const size_t m, const insample_t* const inbuf /*m*/, sample_t* const outbuf /*2m*/)
 				thread_local Vector<double> workbuf;
 				thread_local Vector<double> iobuf_up;
 				thread_local Vector<Sample> drySignal;
@@ -742,21 +619,9 @@ namespace json2wav
 					const double v = x - pThis->vm1*tanshift;
 					// b0 = b1 = 1/(1 + cot(x)) == 0.5*tan(x - tau/8) + 0.5
 					const double g = (0.5*tanshift + 0.5)*(v + pThis->vm1);
-					//const double b01 = 0.5*tanshift + 0.5;
-					//const double g = b01*v + b01*vm1;
 					pThis->vm1 = v;
 					pThis->gm1 = g;
 					return g;
-
-
-#if 0
-					const double cotp1 = 1.0 + std::cot(EnvelopeFilterTimeArg(x - gm1));
-					const double v = vm1*(cotp1 - 2.0)/cotp1 + x;
-					const double g = cotp1*(v + vm1);
-					vm1 = v;
-					gm1 = g;
-					return g;
-#endif
 				}
 
 				virtual double Process(CompressorChannel* pThis, const double x, double& fout) override
@@ -769,8 +634,6 @@ namespace json2wav
 					const double v = x - pThis->vm1*tanshift;
 					// b0 = b1 = 1/(1 + cot(x)) == 0.5*tan(x - tau/8) + 0.5
 					const double g = (0.5*tanshift + 0.5)*(v + pThis->vm1);
-					//const double b01 = 0.5*tanshift + 0.5;
-					//const double g = b01*v + b01*vm1;
 					pThis->vm1 = v;
 					pThis->gm1 = g;
 					return g;
