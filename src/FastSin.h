@@ -26,7 +26,7 @@ namespace json2wav
 {
 	template<typename FloatType> inline constexpr FloatType Tau() noexcept
 	{
-		return static_cast<FloatType>(2.0l * 3.1415926535897932384626433832795l);
+		return static_cast<FloatType>(2.0l * 3.14159265358979323846l);
 	}
 
 	template<typename FloatType> inline constexpr FloatType QuarterTau() noexcept
@@ -186,27 +186,16 @@ namespace json2wav
 		unsigned char* tobyte = reinterpret_cast<unsigned char*>(&to);
 		detail::CopyBytes<sizeof(ToType)>(frombyte, tobyte);
 
-		/*for (unsigned char* tobyte = reinterpret_cast<unsigned char*>(&to),
-			* const stop = reinterpret_cast<unsigned char*>(&to) + sizeof(ToType);
-			tobyte != stop;
-			++frombyte,
-			++tobyte)
-		{
-			*tobyte = *frombyte;
-		}*/
-
 		return to;
 	}
 
 	template<typename FloatType> inline MatchUInt_t<FloatType> FloatToBits(const FloatType x)
 	{
-		//return *reinterpret_cast<const MatchUInt_t<FloatType>*>(&x); // Undefined behavior
 		return BitCast<MatchUInt_t<FloatType>>(x);
 	}
 
 	template<typename FloatType> inline FloatType BitsToFloat(const MatchUInt_t<FloatType> x)
 	{
-		//return *reinterpret_cast<const FloatType*>(&x); // Undefined behavior
 		return BitCast<FloatType>(x);
 	}
 
@@ -276,12 +265,12 @@ namespace json2wav
 		static_assert((inputval & (inputval - 1)) == 0, "json2wav::BitNum only takes powers of two");
 
 		static constexpr const uint64_t value =
-			((0xaaaaaaaaaaaaaaaa & inputval) ? 0x01 : 0) | // 0b10101010...
-			((0xcccccccccccccccc & inputval) ? 0x02 : 0) | // 0b11001100...
-			((0xf0f0f0f0f0f0f0f0 & inputval) ? 0x04 : 0) | // 0b11110000...
-			((0xff00ff00ff00ff00 & inputval) ? 0x08 : 0) | // 0b1111111100000000...
-			((0xffff0000ffff0000 & inputval) ? 0x10 : 0) | // 0b11111111111111110000000000000000...
-			((0xffffffff00000000 & inputval) ? 0x20 : 0); // 0b1111111111111111111111111111111100000000000000000000000000000000
+			((0xaaaaaaaaaaaaaaaaull & inputval) ? 0x01ull : 0ull) | // 0b10101010...
+			((0xccccccccccccccccull & inputval) ? 0x02ull : 0ull) | // 0b11001100...
+			((0xf0f0f0f0f0f0f0f0ull & inputval) ? 0x04ull : 0ull) | // 0b11110000...
+			((0xff00ff00ff00ff00ull & inputval) ? 0x08ull : 0ull) | // 0b1111111100000000...
+			((0xffff0000ffff0000ull & inputval) ? 0x10ull : 0ull) | // etc.
+			((0xffffffff00000000ull & inputval) ? 0x20ull : 0ull);
 	};
 
 	namespace detail
@@ -318,20 +307,7 @@ namespace json2wav
 	template<typename FloatType>
 	inline FloatType floor(const FloatType x) noexcept
 	{
-		//const int trunc = static_cast<int>(x);
-		//return trunc - static_cast<int>(trunc > x);
-
-		//const FloatType trunc = static_cast<FloatType>(static_cast<int>(x));
-		//const bool greater = FloatToBits(trunc) > FloatToBits(x);
-		//return trunc - static_cast<int>(greater);
-
 		return std::floor(x);
-
-		//const MatchUInt_t<FloatType> bits = FloatToBits(x);
-		//const MatchUInt_t<FloatType> sign_bit = bits & SignBit<FloatType>::value;
-		//const MatchUInt_t<FloatType> abs_bits = bits & ~SignBit<FloatType>::value;
-		//const MatchUInt_t<FloatType> abs_floor = FloatToBits(static_cast<FloatType>(static_cast<unsigned int>(BitsToFloat<FloatType>(abs_bits))));
-		//return BitsToFloat<FloatType>(abs_floor | sign_bit) - ((static_cast<int>(!!(abs_bits ^ abs_floor))) & (sign_bit >> detail::MSB_num<FloatType>::value));
 	}
 
 	template<typename FloatType>
@@ -736,8 +712,6 @@ namespace json2wav
 	template<int NumMultiplies, typename FloatType = float>
 	inline FloatType FastCos(const double x) noexcept
 	{
-		//return FastSin<NumMultiplies, FloatType>(vQuarterTau<FloatType>::value - x);
-
 		static_assert(sizeof(float) == 4, "FastCos only supports 4-byte floats");
 		static_assert(sizeof(double) == 8, "FastCos only supports 8-byte doubles");
 		static_assert(IsFloatType<FloatType>::value, "FastCos only operates on floating point types");
