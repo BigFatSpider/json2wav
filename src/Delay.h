@@ -32,13 +32,13 @@ namespace json2wav
 	class Delay : public AudioSum<bOwner>
 	{
 	public:
-		Delay(const float timeInit, const float feedbackInit = 0.0f, const EFeedbackType efbt = EFeedbackType::Gain
-			, const size_t sampleRateInit = 0)
-			: time(timeInit), feedback(CalcFeedback(feedbackInit, efbt)), timeSamples(0)
-			, filtnumch(std::numeric_limits<size_t>::max())
-			, lastNumChannels(0), lastSampleRate(sampleRateInit)
-			, queueLength(256), bQueueInitialized(false)
-			, filter([](const uint_fast8_t ch, const float val) -> Sample { Sample smp(val); return smp; })
+		Delay(const float timeInit, const float feedbackInit = 0.0f, const EFeedbackType efbt = EFeedbackType::Gain,
+			const size_t sampleRateInit = 0)
+			: time(timeInit), feedback(CalcFeedback(feedbackInit, efbt)), timeSamples(0),
+			filtnumch(std::numeric_limits<size_t>::max()),
+			lastNumChannels(0), lastSampleRate(sampleRateInit),
+			queueLength(256), bQueueInitialized(false),
+			filter([](const uint_fast8_t ch, const float val) -> Sample { Sample smp(val); return smp; })
 		{
 		}
 

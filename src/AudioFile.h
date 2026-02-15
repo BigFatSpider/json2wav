@@ -82,7 +82,7 @@ namespace json2wav
 	}
 
 	template<bool bOwner = false>
-	class AudioFileOut// : public AudioSum
+	class AudioFileOut
 	{
 	public:
 		void Write(const std::string& filename, const size_t numSamples, const unsigned long sampleRate = 44100,
