@@ -20,14 +20,14 @@ namespace json2wav
 	public:
 		template<typename... RampArgTypes>
 		AdditiveHitSynthEvent(const ESynthParam param_init, RampArgTypes&&... rampArgs)
-			: SynthEvent<AdditiveHitSynthEvent>(param_init, std::forward<RampArgTypes>(rampArgs)...)
-			, hitStrength(0.0f)
+			: SynthEvent<AdditiveHitSynthEvent>(param_init, std::forward<RampArgTypes>(rampArgs)...),
+			hitStrength(0.0f)
 		{
 		}
 
 		AdditiveHitSynthEvent(const float hitStrengthInit, const float durDummy = 0.0f)
-			: SynthEvent<AdditiveHitSynthEvent>(static_cast<ESynthParam>(-1))
-			, hitStrength(hitStrengthInit)
+			: SynthEvent<AdditiveHitSynthEvent>(static_cast<ESynthParam>(-1)),
+			hitStrength(hitStrengthInit)
 		{
 		}
 
@@ -44,35 +44,34 @@ namespace json2wav
 		static constexpr const size_t NUM_FILTS = 4;
 
 	public:
-		AdditiveHitSynth(const float frequency_init = 100.0f
-			, const bool bActivateFilters = true)
-			: SynthWithCustomEvent<AdditiveHitSynthEvent>(frequency_init, 0.0f, 0.0f)
-			, strenToAmp(0.25f)
-			, transientTime(0.00025)
-			, transientShape(ERampShape::SCurve)
-			, decayDelay(0.1)
-			, decayAmount(0.001f)
-			, decayTime(2.0)
-			, decayShape(ERampShape::LogScaleLinear)
-			, fundFreq(frequency_init)
-			, detuneDelay(0.00075)
-			, detuneAmount(0.9f)
-			, detuneTime(1.0)
-			, detuneShape(ERampShape::LogScaleLinear)
-			, lastSampleRate(0)
-			, bReentering(false)
-			, bFiltersActive(false)
-			, bModesUnlocked(true)
-			, filts{ ctrls.CreatePtr<FiltType>(8000.0f, 0.5f),
+		AdditiveHitSynth(const float frequency_init = 100.0f, const bool bActivateFilters = true)
+			: SynthWithCustomEvent<AdditiveHitSynthEvent>(frequency_init, 0.0f, 0.0f),
+			strenToAmp(0.25f),
+			transientTime(0.00025),
+			transientShape(ERampShape::SCurve),
+			decayDelay(0.1),
+			decayAmount(0.001f),
+			decayTime(2.0),
+			decayShape(ERampShape::LogScaleLinear),
+			fundFreq(frequency_init),
+			detuneDelay(0.00075),
+			detuneAmount(0.9f),
+			detuneTime(1.0),
+			detuneShape(ERampShape::LogScaleLinear),
+			lastSampleRate(0),
+			bReentering(false),
+			bFiltersActive(false),
+			bModesUnlocked(true),
+			filts{ ctrls.CreatePtr<FiltType>(8000.0f, 0.5f),
 				ctrls.CreatePtr<FiltType>(2500.0f, 0.5f),
 				ctrls.CreatePtr<FiltType>(800.0f, 0.7f),
-				ctrls.CreatePtr<FiltType>(fundFreq, 0.7f) }
-			, envs{ Envelope(0.00125f, 0.0125f, 0.0625f, 48.0f, 36.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear),
+				ctrls.CreatePtr<FiltType>(fundFreq, 0.7f) },
+			envs{ Envelope(0.00125f, 0.0125f, 0.0625f, 48.0f, 36.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear),
 				Envelope(0.001875f, 0.01875f, 0.09375f, 24.0f, 18.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear),
 				Envelope(0.00375f, 0.0375f, 0.1875f, 9.0f, 6.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear),
-				Envelope(0.005f, 0.05f, 0.25f, 9.0f, 6.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear) }
-			, filtdels{ 0.0f, 0.0f, 0.0f, 0.005f }
-			, dumb(MakeShared<BasicAudioSum<false, false>>())
+				Envelope(0.005f, 0.05f, 0.25f, 9.0f, 6.0f, ERampShape::SCurve, ERampShape::Linear, ERampShape::Linear) },
+			filtdels{ 0.0f, 0.0f, 0.0f, 0.005f },
+			dumb(MakeShared<BasicAudioSum<false, false>>())
 		{
 			dumb->AddInput(this);
 			if (bActivateFilters)
