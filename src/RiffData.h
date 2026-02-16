@@ -1,9 +1,9 @@
 // Copyright Dan Price 2026.
 
+#include "Memory.h"
 #include <vector>
 #include <algorithm>
 #include <fstream>
-#include <memory>
 #include <cstdint>
 
 namespace json2wav::riff
@@ -346,8 +346,8 @@ namespace json2wav::riff
 		}
 	};
 
-	using DataPtr = std::shared_ptr<RiffData>;
-	using ConstDataPtr = std::shared_ptr<const RiffData>;
+	using DataPtr = SharedPtr<RiffData>;
+	using ConstDataPtr = SharedPtr<const RiffData>;
 
 	template<typename Ptr> struct RemovePtr;
 	template<> struct RemovePtr<DataPtr> { using type = RiffData; };
