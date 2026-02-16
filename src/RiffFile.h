@@ -2,12 +2,12 @@
 
 #include "RiffData.h"
 #include "FourCC.h"
+#include "Memory.h"
 #include <vector>
 #include <iostream>
 #include <fstream>
 #include <iterator>
 #include <string>
-#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <algorithm>
@@ -93,8 +93,8 @@ namespace json2wav
 			std::vector<Byte> bytes;
 		};
 
-		using BytesPtr = std::shared_ptr<RiffBytes>;
-		using ConstBytesPtr = std::shared_ptr<const RiffBytes>;
+		using BytesPtr = SharedPtr<RiffBytes>;
+		using ConstBytesPtr = SharedPtr<const RiffBytes>;
 		template<> struct RemovePtr<BytesPtr> { using type = RiffBytes; };
 		template<> struct RemovePtr<ConstBytesPtr> { using type = const RiffBytes; };
 
@@ -145,14 +145,14 @@ namespace json2wav
 			FourCC data;
 		};
 
-		using FourCCPtr = std::shared_ptr<RiffFourCC>;
-		using ConstFourCCPtr = std::shared_ptr<const RiffFourCC>;
+		using FourCCPtr = SharedPtr<RiffFourCC>;
+		using ConstFourCCPtr = SharedPtr<const RiffFourCC>;
 		template<> struct RemovePtr<FourCCPtr> { using type = RiffFourCC; };
 		template<> struct RemovePtr<ConstFourCCPtr> { using type = const RiffFourCC; };
 
 		class RiffChunk;
-		using ChunkPtr = std::shared_ptr<RiffChunk>;
-		using ConstChunkPtr = std::shared_ptr<const RiffChunk>;
+		using ChunkPtr = SharedPtr<RiffChunk>;
+		using ConstChunkPtr = SharedPtr<const RiffChunk>;
 		template<> struct RemovePtr<ChunkPtr> { using type = RiffChunk; };
 		template<> struct RemovePtr<ConstChunkPtr> { using type = const RiffChunk; };
 
