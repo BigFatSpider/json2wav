@@ -195,16 +195,17 @@ namespace json2wav
 		}
 
 	public:
-		InfiniSaw(const Vector<Jump>& jumps_init
-			, const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const double phase_init = 0.0
-			, const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
-			: SynthWithCustomEvent(frequency_init, amplitude_init, phase_init)
-			, jumps(jumps_init)
-			, blep_peek(GetBlepPeek(ePrecision))
-			, GetBlepRes(GetGetBlepRes(ePrecision))
-			, GetBlepSize(GetGetBlepSize(ePrecision))
+		InfiniSaw(
+			const Vector<Jump>& jumps_init,
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const double phase_init = 0.0,
+			const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
+			: SynthWithCustomEvent(frequency_init, amplitude_init, phase_init),
+			jumps(jumps_init),
+			blep_peek(GetBlepPeek(ePrecision)),
+			GetBlepRes(GetGetBlepRes(ePrecision)),
+			GetBlepSize(GetGetBlepSize(ePrecision))
 #if defined(INFINISAW_LOG_ANTIALIAS) && INFINISAW_LOG_ANTIALIAS
 			, bAaLog(true)
 #endif
@@ -214,16 +215,17 @@ namespace json2wav
 		{
 		}
 
-		InfiniSaw(Vector<Jump>&& jumps_init
-			, const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const double phase_init = 0.0
-			, const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
-			: SynthWithCustomEvent(frequency_init, amplitude_init, phase_init)
-			, jumps(std::move(jumps_init))
-			, blep_peek(GetBlepPeek(ePrecision))
-			, GetBlepRes(GetGetBlepRes(ePrecision))
-			, GetBlepSize(GetGetBlepSize(ePrecision))
+		InfiniSaw(
+			Vector<Jump>&& jumps_init,
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const double phase_init = 0.0,
+			const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
+			: SynthWithCustomEvent(frequency_init, amplitude_init, phase_init),
+			jumps(std::move(jumps_init)),
+			blep_peek(GetBlepPeek(ePrecision)),
+			GetBlepRes(GetGetBlepRes(ePrecision)),
+			GetBlepSize(GetGetBlepSize(ePrecision))
 #if defined(INFINISAW_LOG_ANTIALIAS) && INFINISAW_LOG_ANTIALIAS
 			, bAaLog(true)
 #endif
@@ -233,15 +235,16 @@ namespace json2wav
 		{
 		}
 
-		InfiniSaw(const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const double phase_init = 0.0
-			, const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
-			: SynthWithCustomEvent(frequency_init, amplitude_init, 0.0)
-			, jumps{ Jump(phase_init, 1.0f) }
-			, blep_peek(GetBlepPeek(ePrecision))
-			, GetBlepRes(GetGetBlepRes(ePrecision))
-			, GetBlepSize(GetGetBlepSize(ePrecision))
+		InfiniSaw(
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const double phase_init = 0.0,
+			const EInfiniSawPrecision ePrecision = EInfiniSawPrecision::RFast)
+			: SynthWithCustomEvent(frequency_init, amplitude_init, 0.0),
+			jumps{ Jump(phase_init, 1.0f) },
+			blep_peek(GetBlepPeek(ePrecision)),
+			GetBlepRes(GetGetBlepRes(ePrecision)),
+			GetBlepSize(GetGetBlepSize(ePrecision))
 #if defined(INFINISAW_LOG_ANTIALIAS) && INFINISAW_LOG_ANTIALIAS
 			, bAaLog(true)
 #endif
@@ -1061,7 +1064,7 @@ namespace json2wav
 		InfiniSaw& infiniSaw = ctrl.Get<InfiniSaw>();
 		switch (jumpParam)
 		{
-		case EInfiniSawParam::SynthParam: break; // Solely to prevent warnings as this is impossible
+		case EInfiniSawParam::SynthParam: break;
 		case EInfiniSawParam::HardSync:
 			infiniSaw.HardSync(sampleNum);
 			break;

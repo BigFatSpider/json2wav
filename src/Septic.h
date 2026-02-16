@@ -8,10 +8,10 @@ namespace json2wav
 	class SepticFunctor
 	{
 	public:
-		SepticFunctor(const T a_init, const T b_init, const T c_init, const T d_init
-			, const T e_init, const T f_init, const T g_init, const T h_init) noexcept
-			: a(a_init), b(b_init), c(c_init), d(d_init)
-			, e(e_init), f(f_init), g(g_init), h(h_init)
+		SepticFunctor(const T a_init, const T b_init, const T c_init, const T d_init,
+			const T e_init, const T f_init, const T g_init, const T h_init) noexcept
+			: a(a_init), b(b_init), c(c_init), d(d_init),
+			e(e_init), f(f_init), g(g_init), h(h_init)
 		{
 		}
 

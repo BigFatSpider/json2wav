@@ -16,14 +16,14 @@ namespace json2wav
 		Seed() = delete;
 
 		Seed(const Seed& other) noexcept
-			: lo(other.lo)
-			, hi(other.hi)
+			: lo(other.lo),
+			hi(other.hi)
 		{
 			InitSeq();
 		}
 		Seed(Seed&& other) noexcept
-			: lo(other.lo)
-			, hi(other.hi)
+			: lo(other.lo),
+			hi(other.hi)
 		{
 			InitSeq();
 		}
@@ -34,8 +34,8 @@ namespace json2wav
 			InitSeq();
 		}
 		Seed(const uint32_t lolo, const uint32_t lohi, const uint32_t hilo, const uint32_t hihi) noexcept
-			: lo(static_cast<uint64_t>(lolo) | (static_cast<uint64_t>(lohi) << 32))
-			, hi(static_cast<uint64_t>(hilo) | (static_cast<uint64_t>(hihi) << 32))
+			: lo(static_cast<uint64_t>(lolo) | (static_cast<uint64_t>(lohi) << 32)),
+			hi(static_cast<uint64_t>(hilo) | (static_cast<uint64_t>(hihi) << 32))
 		{
 			InitSeq();
 		}
@@ -310,9 +310,9 @@ namespace json2wav
 		}
 
 		ChooserShared(const ChooserShared& other)
-			: r(other.r)
-			, dist(other.dist.min(), other.dist.max())
-			, w(other.w)
+			: r(other.r),
+			dist(other.dist.min(), other.dist.max()),
+			w(other.w)
 		{
 		}
 

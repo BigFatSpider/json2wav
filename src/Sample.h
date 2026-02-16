@@ -422,11 +422,11 @@ namespace json2wav
 		}
 
 		SampleBuf(const SampleBuf& other)
-			: bufs((other.bInitialized && other.bufs) ? InitializeBufs(other.bufSize, other.numChannels) : nullptr)
-			, numChannels((bufs) ? other.numChannels : 0)
-			, bufSize((bufs) ? other.bufSize : 0)
-			, bInitialized(other.bInitialized)
-			, bZeroOnReinit(other.bZeroOnReinit)
+			: bufs((other.bInitialized && other.bufs) ? InitializeBufs(other.bufSize, other.numChannels) : nullptr),
+			numChannels((bufs) ? other.numChannels : 0),
+			bufSize((bufs) ? other.bufSize : 0),
+			bInitialized(other.bInitialized),
+			bZeroOnReinit(other.bZeroOnReinit)
 		{
 			if (bufs)
 			{
@@ -441,21 +441,21 @@ namespace json2wav
 		}
 
 		SampleBuf(SampleBuf&& other) noexcept
-			: bufs(other.bufs)
-			, numChannels(other.numChannels)
-			, bufSize(other.bufSize)
-			, bInitialized(other.bInitialized)
-			, bZeroOnReinit(other.bZeroOnReinit)
+			: bufs(other.bufs),
+			numChannels(other.numChannels),
+			bufSize(other.bufSize),
+			bInitialized(other.bInitialized),
+			bZeroOnReinit(other.bZeroOnReinit)
 		{
 			other.bufs = nullptr;
 		}
 
 		explicit SampleBuf(const size_t numChannelsInit, const size_t bufSizeInit, const bool bZeroOnReinitInit = true)
-			: bufs(InitializeBufs(bufSizeInit, numChannelsInit))
-			, numChannels((bufs) ? numChannelsInit : 0)
-			, bufSize((bufs) ? bufSizeInit : 0)
-			, bInitialized(true)
-			, bZeroOnReinit(bZeroOnReinitInit)
+			: bufs(InitializeBufs(bufSizeInit, numChannelsInit)),
+			numChannels((bufs) ? numChannelsInit : 0),
+			bufSize((bufs) ? bufSizeInit : 0),
+			bInitialized(true),
+			bZeroOnReinit(bZeroOnReinitInit)
 		{
 		}
 

@@ -37,9 +37,9 @@ namespace json2wav
 		}
 		template<typename... RampArgTypes>
 		SynthEvent(const ESynthParam param_init, RampArgTypes&&... rampargs)
-			: param(param_init)
-			, ramp(ConstructRamp(param_init, std::forward<RampArgTypes>(rampargs)...))
-			, phase_ramp(ConstructPhaseRamp(param_init, std::forward<RampArgTypes>(rampargs)...))
+			: param(param_init),
+			ramp(ConstructRamp(param_init, std::forward<RampArgTypes>(rampargs)...)),
+			phase_ramp(ConstructPhaseRamp(param_init, std::forward<RampArgTypes>(rampargs)...))
 		{
 		}
 
@@ -63,17 +63,18 @@ namespace json2wav
 	class SynthWithCustomEvent : public Instrument<EventType>
 	{
 	public:
-		SynthWithCustomEvent(const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const double phase_init = 0.0)
-			: frequency(frequency_init)
-			, amplitude(amplitude_init)
-			, phase(phase_init)
-			, phaseoffset(0.0)
-			, deltaphase_cached(0.0)
-			, frequency_ramp(frequency_init, 0.0)
-			, amplitude_ramp(amplitude_init, 0.0)
-			, phase_ramp(phase_init, 0.0)
+		SynthWithCustomEvent(
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const double phase_init = 0.0)
+			: frequency(frequency_init),
+			amplitude(amplitude_init),
+			phase(phase_init),
+			phaseoffset(0.0),
+			deltaphase_cached(0.0),
+			frequency_ramp(frequency_init, 0.0),
+			amplitude_ramp(amplitude_init, 0.0),
+			phase_ramp(phase_init, 0.0)
 		{
 		}
 

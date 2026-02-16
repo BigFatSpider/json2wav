@@ -139,12 +139,12 @@ namespace json2wav
 				{
 				}
 				template<typename T> SynthWrapper(SharedPtr<T> ptr)
-					: paudio(ptr)
-					, pcomp(Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr))
-					, pdrum(Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr))
-					, phit(Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr))
-					, idx(0)
-					, methods(*this)
+					: paudio(ptr),
+					pcomp(Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr)),
+					pdrum(Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr)),
+					phit(Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr)),
+					idx(0),
+					methods(*this)
 				{
 					vaudio.push_back(paudio);
 					vcomp.push_back(pcomp);
@@ -419,16 +419,16 @@ namespace json2wav
 
 	public:
 		JsonInterpreter_t(const std::string& nameInit = "music")
-			: mode(nullptr)
-			, error(*this), done(*this, &error), top(*this, &done)
-			, meta(*this, &top), mixer(*this, &top), parts(*this, &top)
-			, volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this)
-			, name(nameInit), beatlen(0.0), key(0.0), samplerate(44100), timelen(0.0f)
-			, pctrls(MakeUnique<ControlSet>()), ctrls(*pctrls)
-			, partdatas(vpartdatas)
-			, mainout(MakeShared<BusData>())
-			, currentbus(mainout)
-			, bIsChild(false)
+			: mode(nullptr),
+			error(*this), done(*this, &error), top(*this, &done),
+			meta(*this, &top), mixer(*this, &top), parts(*this, &top),
+			volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
+			name(nameInit), beatlen(0.0), key(0.0), samplerate(44100), timelen(0.0f),
+			pctrls(MakeUnique<ControlSet>()), ctrls(*pctrls),
+			partdatas(vpartdatas),
+			mainout(MakeShared<BusData>()),
+			currentbus(mainout),
+			bIsChild(false)
 		{
 			mode = &top;
 			wav.AddInput(mainout->volume);
@@ -436,17 +436,17 @@ namespace json2wav
 
 	private:
 		JsonInterpreter_t(JsonInterpreter_t& parent)
-			: mode(nullptr)
-			, error(*this), done(*this, &error), top(*this, &done)
-			, meta(*this, &top), mixer(*this, &top), parts(*this, &top)
-			, volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this)
-			, name(parent.name), beatlen(parent.beatlen), key(parent.key)
-			, samplerate(parent.samplerate), timelen(parent.timelen)
-			, ctrls(parent.ctrls)
-			, partdatas(parent.partdatas)
-			, mainout(parent.mainout)
-			, currentbus(mainout)
-			, bIsChild(true)
+			: mode(nullptr),
+			error(*this), done(*this, &error), top(*this, &done),
+			meta(*this, &top), mixer(*this, &top), parts(*this, &top),
+			volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
+			name(parent.name), beatlen(parent.beatlen), key(parent.key),
+			samplerate(parent.samplerate), timelen(parent.timelen),
+			ctrls(parent.ctrls),
+			partdatas(parent.partdatas),
+			mainout(parent.mainout),
+			currentbus(mainout),
+			bIsChild(true)
 		{
 			mode = &top;
 			top.NoOutput();
@@ -664,9 +664,9 @@ namespace json2wav
 		{
 		public:
 			Meta(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-				: NonErrorMode(rthisInit, pupInit)
-				, name(rthisInit, this), tempo(rthisInit, this), key(rthisInit, this)
-				, bVisited(false)
+				: NonErrorMode(rthisInit, pupInit),
+				name(rthisInit, this), tempo(rthisInit, this), key(rthisInit, this),
+				bVisited(false)
 			{
 			}
 
@@ -984,8 +984,8 @@ namespace json2wav
 			{
 			public:
 				Part(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-					: NonErrorMode(rthisInit, pupInit)
-					, instrument(rthisInit, this), outputs(rthisInit, this), notes(rthisInit, this)
+					: NonErrorMode(rthisInit, pupInit),
+					instrument(rthisInit, this), outputs(rthisInit, this), notes(rthisInit, this)
 				{
 				}
 
@@ -995,18 +995,14 @@ namespace json2wav
 			private:
 				void OnNode(std::string&& nodekey)
 				{
-					// j2wgui markup: numpartparams
 					if (nodekey == "duplication" || nodekey == "dup")
 						this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 							{ this->rthis.partdatas.back().ndups = static_cast<size_t>(*static_cast<double*>(pvalue)); });
-					// j2wgui markup: mappartparams
 					else if (nodekey == "instrument")
 						this->rthis.mode = &instrument;
-					// j2wgui markup: numpartparams
 					else if (nodekey == "volume")
 						this->rthis.PushMode(&this->rthis.volume, [this](void* pvalue)
 							{ this->rthis.partdatas.back().volume = *static_cast<double*>(pvalue); });
-					// j2wgui markup: arrpartparams
 					else if (nodekey == "outputs")
 						this->rthis.mode = &outputs;
 					else if (nodekey == "fx")
@@ -1017,10 +1013,8 @@ namespace json2wav
 							this->rthis.partdatas.back().fx2add.emplace_back(std::move(effect));
 						};
 					}
-					// j2wgui markup: mappartparams
 					else if (nodekey == "notes")
 						this->rthis.mode = &notes;
-					// j2wgui markup: end
 					else
 						this->InvalidKeyError(std::move(nodekey));
 				}
@@ -1226,9 +1220,9 @@ namespace json2wav
 				{
 				public:
 					Instrument(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-						: NonErrorMode(rthisInit, pupInit)
-						, filteredsaw(rthisInit, this), noisehit(rthisInit, this)
-						, drumhit(rthisInit, this), additivehit(rthisInit, this)
+						: NonErrorMode(rthisInit, pupInit),
+						filteredsaw(rthisInit, this), noisehit(rthisInit, this),
+						drumhit(rthisInit, this), additivehit(rthisInit, this)
 					{
 					}
 
@@ -1266,7 +1260,6 @@ namespace json2wav
 						this->up();
 						if (this->rthis.partdatas.back().instrument)
 							this->error("Multiple instruments specified in part");
-						// j2wgui markup: instruments_hardcoded
 						else if (value == "fatsaw0")
 							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateFatSaw0(this->rthis.ctrls));
@@ -1279,7 +1272,6 @@ namespace json2wav
 						else if (value == "solidsaw1")
 							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateSolidSaw1(this->rthis.ctrls));
-						// j2wgui markup: end
 						else
 							this->InvalidStringError(std::move(value));
 					}
@@ -1296,11 +1288,9 @@ namespace json2wav
 
 						virtual std::string ModeKey() const override
 						{
-							// j2wgui markup: instruments_configable
 							if constexpr (bSaw)
 								return "filteredsaw";
 							return "noisehit";
-							// j2wgui markup: end
 						}
 
 					private:
@@ -1357,12 +1347,10 @@ namespace json2wav
 
 						void OnNode(std::string&& nodekey)
 						{
-							// j2wgui markup: strfiltsynth
 							if (nodekey == "preset")
 								this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 									{ preset = *static_cast<std::string*>(pvalue); });
 							else if (nodekey == "topo")
-							// j2wgui markup: topos
 								this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 									{
 										const std::string& topo(*static_cast<std::string*>(pvalue));
@@ -1370,11 +1358,9 @@ namespace json2wav
 											eTopo = Filter::ETopo::DF2;
 										else if (topo == "tdf2")
 											eTopo = Filter::ETopo::TDF2;
-										// j2wgui markup: end
 										else
 											this->error("Invalid filter topology");
 									});
-							// j2wgui markup: numfiltsynth
 							else if (nodekey == "unison")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{
@@ -1396,9 +1382,7 @@ namespace json2wav
 							else if (nodekey == "noisedb")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ noiseAmp = static_cast<float>(Utility::DBToGain(*static_cast<double*>(pvalue))); });
-							// j2wgui markup: end
 							// "amp" = center amplitude envelope
-							// j2wgui markup: numfiltsynth
 							else if (nodekey == "ampattack")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ ampHiAtt = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -1420,7 +1404,6 @@ namespace json2wav
 							else if (nodekey == "ampsusleveldb")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ ampHiSusLev = static_cast<float>(Utility::DBToGain(*static_cast<double*>(pvalue))); });
-							// j2wgui markup: rampfiltsynth
 							else if (nodekey == "ampattshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ ampHiAttRamp = *static_cast<ERampShape*>(pvalue); });
@@ -1430,9 +1413,7 @@ namespace json2wav
 							else if (nodekey == "amprelshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ ampHiRelRamp = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: end
 							// "flamp" = flanking amplitude = amplitude envelope for flanking unison voices
-							// j2wgui markup: numfiltsynth
 							else if (nodekey == "flampattack")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ ampLoAtt = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -1454,7 +1435,6 @@ namespace json2wav
 							else if (nodekey == "flampsusleveldb")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ ampLoSusLev = static_cast<float>(Utility::DBToGain(*static_cast<double*>(pvalue))); });
-							// j2wgui markup: rampfiltsynth
 							else if (nodekey == "flampattshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ ampLoAttRamp = *static_cast<ERampShape*>(pvalue); });
@@ -1464,9 +1444,7 @@ namespace json2wav
 							else if (nodekey == "flamprelshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ ampLoRelRamp = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: end
 							// "filt" = filter envelope
-							// j2wgui markup: numfiltsynth
 							else if (nodekey == "filtattack")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filtAtt = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -1485,7 +1463,6 @@ namespace json2wav
 							else if (nodekey == "filtrestfreq")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filtRestFreq = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: rampfiltsynth
 							else if (nodekey == "filtattshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ filtAttRamp = *static_cast<ERampShape*>(pvalue); });
@@ -1495,18 +1472,15 @@ namespace json2wav
 							else if (nodekey == "filtrelshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ filtRelRamp = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: end
 							else if (nodekey == "sawtype" && bSaw)
 								this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 									{ sawType = std::move(*static_cast<std::string*>(pvalue)); });
-							// j2wgui markup: numfiltsynth
 							else if (nodekey == "ampexpression" || nodekey == "ampexpress" || nodekey == "ampexp")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ ampExpression = static_cast<float>(*static_cast<double*>(pvalue)); });
 							else if (nodekey == "filtexpression" || nodekey == "filtexpress" || nodekey == "filtexp")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filtExpression = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: end
 							else
 								this->InvalidKeyError(std::move(nodekey));
 						}
@@ -1927,11 +1901,9 @@ namespace json2wav
 							if (HandleOnNode(std::move(nodekey)))
 								return;
 
-							// j2wgui markup: strhitsynth
 							if (nodekey == "preset")
 								this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 									{ preset = *static_cast<std::string*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "freq")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ freq = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -1941,11 +1913,9 @@ namespace json2wav
 							else if (nodekey == "transient_time")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ transientTime = *static_cast<double*>(pvalue); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "transient_shape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ transientShape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "decay_delay")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ decayDelay = *static_cast<double*>(pvalue); });
@@ -1955,11 +1925,9 @@ namespace json2wav
 							else if (nodekey == "decay_time")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ decayTime = *static_cast<double*>(pvalue); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "decay_shape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ decayShape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "detune_delay")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ detuneDelay = *static_cast<double*>(pvalue); });
@@ -1969,11 +1937,9 @@ namespace json2wav
 							else if (nodekey == "detune_time")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ detuneTime = *static_cast<double*>(pvalue); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "detune_shape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ detuneShape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "filt0freq")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filt0freq = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -2013,7 +1979,6 @@ namespace json2wav
 							else if (nodekey == "env0suslev")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env0suslev = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "env0attshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env0attshape = *static_cast<ERampShape*>(pvalue); });
@@ -2023,7 +1988,6 @@ namespace json2wav
 							else if (nodekey == "env0relshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env0relshape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "env1att")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env1att = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -2039,7 +2003,6 @@ namespace json2wav
 							else if (nodekey == "env1suslev")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env1suslev = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "env1attshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env1attshape = *static_cast<ERampShape*>(pvalue); });
@@ -2049,7 +2012,6 @@ namespace json2wav
 							else if (nodekey == "env1relshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env1relshape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "env2att")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env2att = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -2065,7 +2027,6 @@ namespace json2wav
 							else if (nodekey == "env2suslev")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env2suslev = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "env2attshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env2attshape = *static_cast<ERampShape*>(pvalue); });
@@ -2075,7 +2036,6 @@ namespace json2wav
 							else if (nodekey == "env2relshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env2relshape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "env3att")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env3att = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -2091,7 +2051,6 @@ namespace json2wav
 							else if (nodekey == "env3suslev")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ env3suslev = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: ramphitsynth
 							else if (nodekey == "env3attshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env3attshape = *static_cast<ERampShape*>(pvalue); });
@@ -2101,7 +2060,6 @@ namespace json2wav
 							else if (nodekey == "env3relshape")
 								this->rthis.PushMode(&this->rthis.paRamp, [this](void* pvalue)
 									{ env3relshape = *static_cast<ERampShape*>(pvalue); });
-							// j2wgui markup: numhitsynth
 							else if (nodekey == "filt0del")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filt0del = static_cast<float>(*static_cast<double*>(pvalue)); });
@@ -2114,7 +2072,6 @@ namespace json2wav
 							else if (nodekey == "filt3del")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ filt3del = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: end
 							else
 								this->InvalidKeyError(std::move(nodekey));
 						}
@@ -2261,9 +2218,7 @@ namespace json2wav
 
 						virtual std::string ModeKey() const override
 						{
-							// j2wgui markup: instruments_configable
 							return "drumhit";
-							// j2wgui markup: end
 						}
 
 					private:
@@ -2285,18 +2240,15 @@ namespace json2wav
 
 						virtual bool HandleOnNode(std::string&& nodekey) override
 						{
-							// j2wgui markup: numhitsynth_drum
 							if (nodekey == "mic_r")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ mic_r = static_cast<float>(*static_cast<double*>(pvalue)); });
 							else if (nodekey == "hit_range_r")
 								this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 									{ hit_range_r = static_cast<float>(*static_cast<double*>(pvalue)); });
-							// j2wgui markup: strhitsynth_drum
 							else if (nodekey == "modecay" || nodekey == "modedecay")
 								this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 									{ modecay = *static_cast<std::string*>(pvalue); });
-							// j2wgui markup: end
 							else
 								return false;
 							return true;
@@ -2319,9 +2271,7 @@ namespace json2wav
 
 						virtual std::string ModeKey() const override
 						{
-							// j2wgui markup: instruments_configable
 							return "additivehit";
-							// j2wgui markup: end
 						}
 
 					private:
@@ -2342,7 +2292,6 @@ namespace json2wav
 
 						virtual bool HandleOnNode(std::string&& nodekey) override
 						{
-							// j2wgui markup: numlisthitsynth_additive
 							if (nodekey == "freqs")
 							{
 								floatlist.SetFloatList(freqs);
@@ -2353,7 +2302,6 @@ namespace json2wav
 								floatlist.SetFloatList(amps);
 								this->rthis.mode = &floatlist;
 							}
-							// j2wgui markup: end
 							else
 								return false;
 							return true;
@@ -2524,9 +2472,9 @@ namespace json2wav
 				{
 				public:
 					Notes(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-						: NonErrorMode(rthisInit, pupInit)
-						, tuning(rthisInit, this), timing(rthisInit, this), mindur(rthisInit, this)
-						, db(rthisInit, this), values(rthisInit, this), sidechain(rthisInit, this)
+						: NonErrorMode(rthisInit, pupInit),
+						tuning(rthisInit, this), timing(rthisInit, this), mindur(rthisInit, this),
+						db(rthisInit, this), values(rthisInit, this), sidechain(rthisInit, this)
 					{
 					}
 
@@ -2536,12 +2484,10 @@ namespace json2wav
 				private:
 					void OnNode(std::string&& nodekey)
 					{
-						// j2wgui markup: strnotesparams
 						if (nodekey == "tuning")
 							this->rthis.mode = &tuning;
 						else if (nodekey == "timing")
 							this->rthis.mode = &timing;
-						// j2wgui markup: numnotesparams
 						else if (nodekey == "minduration" || nodekey == "mindur")
 							this->rthis.mode = &mindur;
 						else if (nodekey == "dur" || nodekey == "duration")
@@ -2550,13 +2496,10 @@ namespace json2wav
 									this->rthis.partdatas.back().dur =
 										static_cast<float>(this->rthis.beatlen * (*static_cast<double*>(pvalue)));
 								});
-						// j2wgui markup: boolnotesparams
 						else if (nodekey == "db")
 							this->rthis.mode = &db;
-						// j2wgui markup: arrnotesparams
 						else if (nodekey == "values")
 							this->rthis.mode = &values;
-						// j2wgui markup: end
 						else if (nodekey == "sidechain")
 							this->rthis.mode = &sidechain;
 						else if (nodekey == "transpose")
@@ -2595,9 +2538,7 @@ namespace json2wav
 						virtual void OnString(std::string&& value) override
 						{
 							this->up();
-							// j2wgui markup: tunings
 							if (value.substr(0, 3) == "edo")
-							// j2wgui markup: end
 							{
 								uint_fast16_t edo(0);
 								for (const char c : value.substr(3))
@@ -2619,12 +2560,10 @@ namespace json2wav
 								}
 								this->rthis.partdatas.back().edoinv = 1.0 / static_cast<double>(edo);
 							}
-							// j2wgui markup: tunings
 							else if (value == "just")
 								this->rthis.partdatas.back().edoinv = 1.0;
 							else if (value == "freq")
 								this->rthis.partdatas.back().edoinv = 0.0;
-							// j2wgui markup: end
 							else
 								this->InvalidStringError(std::move(value));
 						}
@@ -2651,14 +2590,12 @@ namespace json2wav
 						virtual void OnString(std::string&& value) override
 						{
 							this->up();
-							// j2wgui markup: timings
 							if (value == "absolute")
 								getnotesmode()->values.SetAbsoluteTime();
 							else if (value == "relative")
 								getnotesmode()->values.SetRelativeTime();
 							else if (value == "intuitive")
 								getnotesmode()->values.SetIntuitiveTime();
-							// j2wgui markup: end
 							else
 								this->InvalidStringError(std::move(value));
 						}
@@ -2765,11 +2702,11 @@ namespace json2wav
 						{
 						public:
 							Value(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-								: NonErrorMode(rthisInit, pupInit)
-								, pitch(rthisInit, this), beat(rthisInit, this), beatrel(rthisInit, this)
-								, dur(rthisInit, this), art(rthisInit, this), amp(rthisInit, this)
-								, notevalerr(rthisInit)
-								, valuemodes{ &pitch, &beat, &dur, &amp }, nextmode(0)
+								: NonErrorMode(rthisInit, pupInit),
+								pitch(rthisInit, this), beat(rthisInit, this), beatrel(rthisInit, this),
+								dur(rthisInit, this), art(rthisInit, this), amp(rthisInit, this),
+								notevalerr(rthisInit),
+								valuemodes{ &pitch, &beat, &dur, &amp }, nextmode(0)
 							{
 							}
 
@@ -3289,9 +3226,9 @@ namespace json2wav
 		{
 		public:
 			FX(JsonInterpreter& rthisInit)
-				: NonErrorMode(rthisInit, &rthisInit.error)
-				, params(rthisInit, this)
-				, bTwoPops(false)
+				: NonErrorMode(rthisInit, &rthisInit.error),
+				params(rthisInit, this),
+				bTwoPops(false)
 			{
 			}
 
@@ -3386,7 +3323,6 @@ namespace json2wav
 			{
 				bTwoPops = true;
 				this->rthis.mode = &params;
-				// j2wgui markup: fx_fqt
 				if (nodekey == "bqlopass")
 					params.SetEffect(EValidFX::BiquadLP);
 				else if (nodekey == "bqhipass")
@@ -3395,50 +3331,38 @@ namespace json2wav
 					params.SetEffect(EValidFX::BiquadAP);
 				else if (nodekey == "bqnotch")
 					params.SetEffect(EValidFX::BiquadNotch);
-				// j2wgui markup: fx_fqgt
 				else if (nodekey == "bqpeak")
 					params.SetEffect(EValidFX::BiquadPeak);
 				else if (nodekey == "bqloshelf")
 					params.SetEffect(EValidFX::BiquadLoShelf);
 				else if (nodekey == "bqhishelf")
 					params.SetEffect(EValidFX::BiquadHiShelf);
-				// j2wgui markup: fx_fqto
 				else if (nodekey == "ladder")
 					params.SetEffect(EValidFX::Ladder);
-				// j2wgui markup: fx_fto
 				else if (nodekey == "bessellopass")
 					params.SetEffect(EValidFX::BesselLP);
-				// j2wgui markup: fx_p
 				else if (nodekey == "panner")
 					params.SetEffect(EValidFX::Panner);
-				// j2wgui markup: fx_g
 				else if (nodekey == "fader")
 					params.SetEffect(EValidFX::Fader);
-				// j2wgui markup: fx_dbfto
 				else if (nodekey == "delay")
 					params.SetEffect(EValidFX::Delay);
-				// j2wgui markup: fx_o
 				else if (nodekey == "distortion")
 					params.SetEffect(EValidFX::Distortion);
 				else if (nodekey == "busdistortion" || nodekey == "busdrive")
 					params.SetEffect(EValidFX::BusDistortion);
-				// j2wgui markup: fx_none
 				else if (nodekey == "ringmod")
 					params.SetEffect(EValidFX::RingMod);
-				// j2wgui markup: fx_p
 				else if (nodekey == "ringmodsum")
 					params.SetEffect(EValidFX::RingModSum);
-				// j2wgui markup: fx_c
 				else if (nodekey == "compressor" || nodekey == "comp")
 					params.SetEffect(EValidFX::Compressor);
-				// j2wgui markup: fx_none
 				else if (nodekey == "reverb" || nodekey == "verb")
 					params.SetEffect(EValidFX::Reverb);
 				else if (nodekey == "ms")
 					params.SetEffect(EValidFX::MSConverter);
 				else if (nodekey == "lr")
 					params.SetEffect(EValidFX::LRConverter);
-				// j2wgui markup: end
 				else
 					this->InvalidKeyError(std::move(nodekey));
 			}
@@ -3469,7 +3393,6 @@ namespace json2wav
 			private:
 				void OnNode(std::string&& nodekey)
 				{
-					// j2wgui markup: numfxparams
 					if (nodekey == "freq")
 					{
 						if (FXParams[static_cast<size_t>(eEffect)] & ParamFreqBit)
@@ -3503,7 +3426,6 @@ namespace json2wav
 						else
 							this->InvalidKeyError(std::move(nodekey));
 					}
-					// j2wgui markup: strfxparams
 					else if (nodekey == "topo")
 					{
 						if (FXParams[static_cast<size_t>(eEffect)] & ParamTopoBit)
@@ -3515,7 +3437,6 @@ namespace json2wav
 						else
 							this->InvalidKeyError(std::move(nodekey));
 					}
-					// j2wgui markup: numfxparams
 					else if (nodekey == "order")
 					{
 						if (FXParams[static_cast<size_t>(eEffect)] & ParamOrderBit)
@@ -3674,7 +3595,6 @@ namespace json2wav
 						else
 							this->InvalidKeyError(std::move(nodekey));
 					}
-					// j2wgui markup: boolfxparams
 					else if (nodekey == "link" || nodekey == "stereolink")
 					{
 						if (FXParams[static_cast<size_t>(eEffect)] & ParamStereoLinkBit)
@@ -3686,7 +3606,6 @@ namespace json2wav
 						else
 							this->InvalidKeyError(std::move(nodekey));
 					}
-					// j2wgui markup: end
 					else if (nodekey == "none")
 					{
 						if (FXParams[static_cast<size_t>(eEffect)] == ParamsNone)
@@ -4199,7 +4118,6 @@ namespace json2wav
 			virtual void OnString(std::string&& value) override
 			{
 				ERampShape eShape(static_cast<ERampShape>(-1));
-				// j2wgui markup: ramps
 				if (value == "instant")
 					eShape = ERampShape::Instant;
 				else if (value == "linear")
@@ -4230,7 +4148,6 @@ namespace json2wav
 					eShape = ERampShape::Hit2A2;
 				else if (value == "hit2624")
 					eShape = ERampShape::Hit2624;
-				// j2wgui markup: end
 				else
 					this->InvalidStringError(std::move(value));
 
