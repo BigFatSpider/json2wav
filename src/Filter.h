@@ -256,9 +256,7 @@ namespace json2wav::Filter
 	{
 	protected:
 		explicit FilterBase(const float freq_init, const float res_init, const float gainDB_init)
-			: freq(freq_init)
-			, res(res_init)
-			, gainDB(gainDB_init)
+			: freq(freq_init), res(res_init), gainDB(gainDB_init)
 		{
 		}
 
@@ -332,14 +330,15 @@ namespace json2wav::Filter
 		static_assert(order < 255, "255-order filter causes integer overflow and is an absurdly high order anyway");
 
 	public:
-		explicit Filter(const float freq_init = 1000.0f
-			, const float res_init = 1.0f
-			, const float gainDB_init = 0.0f
-			, const uint_fast16_t controlUpdate_init = 1)
-			: FilterBase<bOwner>(freq_init, res_init, gainDB_init)
-			, controlUpdateInterval(controlUpdate_init)
-			, controlUpdateCounter(1)
-			, lastSampleRate(0)
+		explicit Filter(
+			const float freq_init = 1000.0f,
+			const float res_init = 1.0f,
+			const float gainDB_init = 0.0f,
+			const uint_fast16_t controlUpdate_init = 1)
+			: FilterBase<bOwner>(freq_init, res_init, gainDB_init),
+			controlUpdateInterval(controlUpdate_init),
+			controlUpdateCounter(1),
+			lastSampleRate(0)
 		{
 			for (uint_fast8_t ch = 0; ch < numch; ++ch)
 			{
@@ -445,12 +444,13 @@ namespace json2wav::Filter
 		using Super = Filter<order, bOwner, numch, FloatType, eTopo>;
 
 	public:
-		explicit LaplaceFilter(const float freq_init = 1000.0f
-			, const float res_init = 1.0f
-			, const float gainDB_init = 0.0f
-			, const uint_fast16_t controlUpdate_init = 1)
-			: Super(freq_init, res_init, gainDB_init, controlUpdate_init)
-			, laplace(*this)
+		explicit LaplaceFilter(
+			const float freq_init = 1000.0f,
+			const float res_init = 1.0f,
+			const float gainDB_init = 0.0f,
+			const uint_fast16_t controlUpdate_init = 1)
+			: Super(freq_init, res_init, gainDB_init, controlUpdate_init),
+			laplace(*this)
 		{
 		}
 
@@ -553,10 +553,11 @@ namespace json2wav::Filter
 		using Super = LaplaceFilter<order, LadderLPLaplace<LaplaceFloatType, order, bOwner>, bOwner, numch, FilterFloatType, eTopo>;
 
 	public:
-		explicit LadderLP_Custom(const float freq_init = 1000.0f
-			, const float res_init = 1.0f
-			, const float gainDB_init = 0.0f
-			, const uint_fast16_t controlUpdate_init = 1)
+		explicit LadderLP_Custom(
+			const float freq_init = 1000.0f,
+			const float res_init = 1.0f,
+			const float gainDB_init = 0.0f,
+			const uint_fast16_t controlUpdate_init = 1)
 			: Super(freq_init, res_init, gainDB_init, controlUpdate_init)
 		{
 		}
@@ -571,10 +572,11 @@ namespace json2wav::Filter
 		using Super = LaplaceFilter<order, BesselLPLaplace<LaplaceFloatType, order>, bOwner, numch, FilterFloatType, eTopo>;
 
 	public:
-		explicit BesselLP_Custom(const float freq_init = 1000.0f
-			, const float res_init = 1.0f
-			, const float gainDB_init = 0.0f
-			, const uint_fast16_t controlUpdate_init = 1)
+		explicit BesselLP_Custom(
+			const float freq_init = 1000.0f,
+			const float res_init = 1.0f,
+			const float gainDB_init = 0.0f,
+			const uint_fast16_t controlUpdate_init = 1)
 			: Super(freq_init, res_init, gainDB_init, controlUpdate_init)
 		{
 		}
@@ -590,10 +592,11 @@ namespace json2wav::Filter
 		using Super = Filter<2, bOwner, numch, FloatType, eTopo>; \
 		static constexpr const uint_fast8_t order = 2; \
 	public: \
-		explicit Biquad##TypeSuffix##_Custom(const float freq_init = 1000.0f \
-			, const float res_init = 1.0f \
-			, const float gainDB_init = 0.0f \
-			, const uint_fast16_t controlUpdate_init = 1) \
+		explicit Biquad##TypeSuffix##_Custom( \
+			const float freq_init = 1000.0f, \
+			const float res_init = 1.0f, \
+			const float gainDB_init = 0.0f, \
+			const uint_fast16_t controlUpdate_init = 1) \
 			: Super(freq_init, res_init, gainDB_init, controlUpdate_init) \
 		{ \
 		} \

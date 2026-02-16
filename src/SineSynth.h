@@ -11,9 +11,10 @@ namespace json2wav
 	class SinusoidSynth : public BasicSynth
 	{
 	public:
-		SinusoidSynth(const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const float phase_init = 0.0f)
+		SinusoidSynth(
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const float phase_init = 0.0f)
 			: BasicSynth(frequency_init, amplitude_init, phase_init)
 		{
 		}

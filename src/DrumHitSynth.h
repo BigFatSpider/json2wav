@@ -791,7 +791,7 @@ namespace json2wav
 		DrumHitSynth& drum = ctrl.Get<DrumHitSynth>();
 		switch (drumHitParam)
 		{
-		case EDrumHitSynthParam::SynthParam: break; // Solely to prevent warnings as this is impossible
+		case EDrumHitSynthParam::SynthParam: break;
 		case EDrumHitSynthParam::HitRadius: drum.SetHitRadius(ramp); break;
 		case EDrumHitSynthParam::HitAngle: drum.SetHitAngle(ramp); break;
 		case EDrumHitSynthParam::MicRadius: drum.SetMicRadius(ramp); break;

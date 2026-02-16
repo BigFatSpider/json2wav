@@ -40,15 +40,15 @@ namespace json2wav
 	public:
 		template<typename... RampArgTypes>
 		PWMageEvent(const ESynthParam param_init, RampArgTypes&&... rampArgs)
-			: SynthEvent<PWMageEvent<eChanMask>>(param_init, std::forward<RampArgTypes>(rampArgs)...)
-			, pwmageParam(EPWMageParam::SynthParam)
+			: SynthEvent<PWMageEvent<eChanMask>>(param_init, std::forward<RampArgTypes>(rampArgs)...),
+			pwmageParam(EPWMageParam::SynthParam)
 		{
 		}
 
 		template<typename... RampArgTypes>
 		PWMageEvent(const EPWMageParam param_init, RampArgTypes&&... rampArgs)
-			: SynthEvent<PWMageEvent<eChanMask>>(VerifyPWMageParam(param_init), std::forward<RampArgTypes>(rampArgs)...)
-			, pwmageParam(param_init)
+			: SynthEvent<PWMageEvent<eChanMask>>(VerifyPWMageParam(param_init), std::forward<RampArgTypes>(rampArgs)...),
+			pwmageParam(param_init)
 		{
 		}
 
@@ -60,17 +60,17 @@ namespace json2wav
 	struct PWMSquareState
 	{
 		PWMSquareState()
-			: freqm2(1000.0f), phasem2(1.0-1000.0/44100.0), pwm2(0.3), pwmm2(0.7), pmphasem2(1.0-1000.0/44100.0)
+			: freqm2(1000.0f), phasem2(1.0-1000.0/44100.0), pwm2(0.3), pwmm2(0.7), pmphasem2(1.0-1000.0/44100.0),
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			, pwmsq_freqm1(1000.0f), pwmsq_wm1(0.001), pwmsq_phasem1(1.0-1000.0/88200.0), pwmsq_pmphasem1(1.0-1000.0/88200.0)
-			, pwmsq_pwm1(0.5), pwmsq_pwmm1(0.5), modampm1(0.5), saw_instaphasem1(1.0-1000.0/88200.0)
-			, pmsaw_instaphasem1(1.0-1000.0/88200.0), pmsaw_instafreqm1(1000.0/44100.0)
-			, saw_smpm1(0.0), pmsaw_smpm1(0.0), pwmsq_smpm1(0.0), pwmsq_w(0.001)
-			, pwmsq_pmphase(1.0-1000.0/44100.0), modamp(0.5), saw_instaphase(1.0-1000.0/44100.0)
-			, pmsaw_instaphase(1.0-1000.0/44100.0), pmsaw_instafreq(1000.0/44100.0)
-			, saw_smp(0.0), pmsaw_smp(0.0), pwmsq_smp(0.0)
+			pwmsq_freqm1(1000.0f), pwmsq_wm1(0.001), pwmsq_phasem1(1.0-1000.0/88200.0), pwmsq_pmphasem1(1.0-1000.0/88200.0),
+			pwmsq_pwm1(0.5), pwmsq_pwmm1(0.5), modampm1(0.5), saw_instaphasem1(1.0-1000.0/88200.0),
+			pmsaw_instaphasem1(1.0-1000.0/88200.0), pmsaw_instafreqm1(1000.0/44100.0),
+			saw_smpm1(0.0), pmsaw_smpm1(0.0), pwmsq_smpm1(0.0), pwmsq_w(0.001),
+			pwmsq_pmphase(1.0-1000.0/44100.0), modamp(0.5), saw_instaphase(1.0-1000.0/44100.0),
+			pmsaw_instaphase(1.0-1000.0/44100.0), pmsaw_instafreq(1000.0/44100.0),
+			saw_smp(0.0), pmsaw_smp(0.0), pwmsq_smp(0.0),
 #endif
-			, saw_prev{ 0 }, pmsaw_prev{ 0 }
+			saw_prev{ 0 }, pmsaw_prev{ 0 }
 		{
 		}
 		oversampling::downsampler441_x2<double> ds;
@@ -114,48 +114,34 @@ namespace json2wav
 	struct PWMSquareStateCapture
 	{
 		PWMSquareStateCapture(const PWMSquareStateCapture& other)
-			: freqm2(other.freqm2), phasem2(other.phasem2), pwm2(other.pwm2), pwmm2(other.pwmm2), pmphasem2(other.pmphasem2)
-
-			, pwmsq_freqm1(other.pwmsq_freqm1), pwmsq_wm1(other.pwmsq_wm1), pwmsq_phasem1(other.pwmsq_phasem1)
-			, pwmsq_pmphasem1(other.pwmsq_pmphasem1), pwmsq_pwm1(other.pwmsq_pwm1), pwmsq_pwmm1(other.pwmsq_pwmm1)
-			, modampm1(other.modampm1), saw_instaphasem1(other.saw_instaphasem1), pmsaw_instaphasem1(other.pmsaw_instaphasem1)
-			, pmsaw_instafreqm1(other.pmsaw_instafreqm1), saw_smpm1(other.saw_smpm1), pmsaw_smpm1(other.pmsaw_smpm1)
-			, pwmsq_smpm1(other.pwmsq_smpm1), pwmsq_w(other.pwmsq_w), pwmsq_pmphase(other.pwmsq_pmphase)
-			, modamp(other.modamp), saw_instaphase(other.saw_instaphase)
-
-			, pmsaw_instaphase(other.pmsaw_instaphase), pmsaw_instafreq(other.pmsaw_instafreq)
-
-			, saw_smp(other.saw_smp), pmsaw_smp(other.pmsaw_smp), pwmsq_smp(other.pwmsq_smp)
-
-			, output(other.output)
-
-			, saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3]
-				}
-			, pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3]
-				}
+			: freqm2(other.freqm2), phasem2(other.phasem2), pwm2(other.pwm2), pwmm2(other.pwmm2), pmphasem2(other.pmphasem2),
+			pwmsq_freqm1(other.pwmsq_freqm1), pwmsq_wm1(other.pwmsq_wm1), pwmsq_phasem1(other.pwmsq_phasem1),
+			pwmsq_pmphasem1(other.pwmsq_pmphasem1), pwmsq_pwm1(other.pwmsq_pwm1), pwmsq_pwmm1(other.pwmsq_pwmm1),
+			modampm1(other.modampm1), saw_instaphasem1(other.saw_instaphasem1), pmsaw_instaphasem1(other.pmsaw_instaphasem1),
+			pmsaw_instafreqm1(other.pmsaw_instafreqm1), saw_smpm1(other.saw_smpm1), pmsaw_smpm1(other.pmsaw_smpm1),
+			pwmsq_smpm1(other.pwmsq_smpm1), pwmsq_w(other.pwmsq_w), pwmsq_pmphase(other.pwmsq_pmphase),
+			modamp(other.modamp), saw_instaphase(other.saw_instaphase),
+			pmsaw_instaphase(other.pmsaw_instaphase), pmsaw_instafreq(other.pmsaw_instafreq),
+			saw_smp(other.saw_smp), pmsaw_smp(other.pmsaw_smp), pwmsq_smp(other.pwmsq_smp),
+			output(other.output),
+			saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3] },
+			pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3] }
 		{
 		}
 
 		PWMSquareStateCapture(const PWMSquareState& other)
-			: freqm2(other.freqm2), phasem2(other.phasem2), pwm2(other.pwm2), pwmm2(other.pwmm2), pmphasem2(other.pmphasem2)
-
-			, pwmsq_freqm1(other.pwmsq_freqm1), pwmsq_wm1(other.pwmsq_wm1), pwmsq_phasem1(other.pwmsq_phasem1)
-			, pwmsq_pmphasem1(other.pwmsq_pmphasem1), pwmsq_pwm1(other.pwmsq_pwm1), pwmsq_pwmm1(other.pwmsq_pwmm1)
-			, modampm1(other.modampm1), saw_instaphasem1(other.saw_instaphasem1), pmsaw_instaphasem1(other.pmsaw_instaphasem1)
-			, pmsaw_instafreqm1(other.pmsaw_instafreqm1), saw_smpm1(other.saw_smpm1), pmsaw_smpm1(other.pmsaw_smpm1)
-			, pwmsq_smpm1(other.pwmsq_smpm1), pwmsq_w(other.pwmsq_w), pwmsq_pmphase(other.pwmsq_pmphase)
-			, modamp(other.modamp), saw_instaphase(other.saw_instaphase)
-
-			, pmsaw_instaphase(other.pmsaw_instaphase), pmsaw_instafreq(other.pmsaw_instafreq)
-
-			, saw_smp(other.saw_smp), pmsaw_smp(other.pmsaw_smp), pwmsq_smp(other.pwmsq_smp)
-
-			, output(0.0f)
-
-			, saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3]
-				}
-			, pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3]
-				}
+			: freqm2(other.freqm2), phasem2(other.phasem2), pwm2(other.pwm2), pwmm2(other.pwmm2), pmphasem2(other.pmphasem2),
+			pwmsq_freqm1(other.pwmsq_freqm1), pwmsq_wm1(other.pwmsq_wm1), pwmsq_phasem1(other.pwmsq_phasem1),
+			pwmsq_pmphasem1(other.pwmsq_pmphasem1), pwmsq_pwm1(other.pwmsq_pwm1), pwmsq_pwmm1(other.pwmsq_pwmm1),
+			modampm1(other.modampm1), saw_instaphasem1(other.saw_instaphasem1), pmsaw_instaphasem1(other.pmsaw_instaphasem1),
+			pmsaw_instafreqm1(other.pmsaw_instafreqm1), saw_smpm1(other.saw_smpm1), pmsaw_smpm1(other.pmsaw_smpm1),
+			pwmsq_smpm1(other.pwmsq_smpm1), pwmsq_w(other.pwmsq_w), pwmsq_pmphase(other.pwmsq_pmphase),
+			modamp(other.modamp), saw_instaphase(other.saw_instaphase),
+			pmsaw_instaphase(other.pmsaw_instaphase), pmsaw_instafreq(other.pmsaw_instafreq),
+			saw_smp(other.saw_smp), pmsaw_smp(other.pmsaw_smp), pwmsq_smp(other.pwmsq_smp),
+			output(0.0f),
+			saw_prev{ other.saw_prev[0], other.saw_prev[1], other.saw_prev[2], other.saw_prev[3] },
+			pmsaw_prev{ other.pmsaw_prev[0], other.pmsaw_prev[1], other.pmsaw_prev[2], other.pmsaw_prev[3] }
 		{
 		}
 
@@ -333,55 +319,56 @@ namespace json2wav
 	class PWMage : public SynthWithCustomEvent<PWMageEvent<eChanMask>>
 	{
 	public:
-		PWMage(const float frequency_init = 1000.0f
-			, const float amplitude_init = 0.5f
-			, const double phase_init = 0.0)
-			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(frequency_init, amplitude_init, phase_init)
-			, amt(0.7)
-			, center(0.3)
-			, bStateInitialized(false)
+		PWMage(
+			const float frequency_init = 1000.0f,
+			const float amplitude_init = 0.5f,
+			const double phase_init = 0.0)
+			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(frequency_init, amplitude_init, phase_init),
+			amt(0.7),
+			center(0.3),
+			bStateInitialized(false)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			, crackle(history_size, 0)
-			, crackre(history_size, 0)
-			, cracklepos(0)
-			, nsamplesgot(0)
-			, lhistory(history_size)
-			, rhistory(history_size)
-			, chistory(history_size)
+			, crackle(history_size, 0),
+			crackre(history_size, 0),
+			cracklepos(0),
+			nsamplesgot(0),
+			lhistory(history_size),
+			rhistory(history_size),
+			chistory(history_size)
 #endif
 		{
 		}
 
 		PWMage(const PWMage& other)
-			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(other)
-			, amt(other.amt)
-			, center(other.center)
-			, bStateInitialized(other.bStateInitialized)
+			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(other),
+			amt(other.amt),
+			center(other.center),
+			bStateInitialized(other.bStateInitialized)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			, crackle(other.crackle)
-			, crackre(other.crackre)
-			, cracklepos(other.cracklepos)
-			, nsamplesgot(other.nsamplesgot)
-			, lhistory(other.lhistory)
-			, rhistory(other.rhistory)
-			, chistory(other.chistory)
+			, crackle(other.crackle),
+			crackre(other.crackre),
+			cracklepos(other.cracklepos),
+			nsamplesgot(other.nsamplesgot),
+			lhistory(other.lhistory),
+			rhistory(other.rhistory),
+			chistory(other.chistory)
 #endif
 		{
 		}
 
 		PWMage(PWMage&& other) noexcept
-			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(std::move(other))
-			, amt(other.amt)
-			, center(other.center)
-			, bStateInitialized(other.bStateInitialized)
+			: SynthWithCustomEvent<PWMageEvent<eChanMask>>(std::move(other)),
+			amt(other.amt),
+			center(other.center),
+			bStateInitialized(other.bStateInitialized)
 #if defined(DEBUG_PWMAGE) && DEBUG_PWMAGE
-			, crackle(std::move(other.crackle))
-			, crackre(std::move(other.crackre))
-			, cracklepos(other.cracklepos)
-			, nsamplesgot(other.nsamplesgot)
-			, lhistory(std::move(other.lhistory))
-			, rhistory(std::move(other.rhistory))
-			, chistory(std::move(other.chistory))
+			, crackle(std::move(other.crackle)),
+			crackre(std::move(other.crackre)),
+			cracklepos(other.cracklepos),
+			nsamplesgot(other.nsamplesgot),
+			lhistory(std::move(other.lhistory)),
+			rhistory(std::move(other.rhistory)),
+			chistory(std::move(other.chistory))
 #endif
 		{
 		}
