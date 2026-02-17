@@ -356,7 +356,7 @@ namespace json2wav::riff
 	template<typename RiffPtr, typename... Ts>
 	inline RiffPtr MakePtr(Ts&&... CtorArgs)
 	{
-		return std::make_shared<typename RemovePtr<RiffPtr>::type>(std::forward<Ts>(CtorArgs)...);
+		return MakeShared<typename RemovePtr<RiffPtr>::type>(std::forward<Ts>(CtorArgs)...);
 	}
 }
 
