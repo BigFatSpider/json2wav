@@ -65,7 +65,7 @@ namespace json2wav
 				}
 			}
 
-			explicit RiffBytes(std::vector<Byte>&& data)
+			explicit RiffBytes(Vector<Byte>&& data)
 				: bytes(std::move(data))
 			{
 			}
@@ -90,7 +90,7 @@ namespace json2wav
 			}
 
 		private:
-			std::vector<Byte> bytes;
+			Vector<Byte> bytes;
 		};
 
 		using BytesPtr = SharedPtr<RiffBytes>;
@@ -246,7 +246,7 @@ namespace json2wav
 				}
 			}
 
-			explicit RiffChunk(const ChunkID& ckidInit, std::vector<DataPtr>&& ckdataInit)
+			explicit RiffChunk(const ChunkID& ckidInit, Vector<DataPtr>&& ckdataInit)
 				: ckid(ckidInit), cksz(
 					[&ckdataInit]()
 					{
@@ -260,7 +260,7 @@ namespace json2wav
 			{
 			}
 
-			RiffChunk& operator=(std::vector<DataPtr>&& newdata) noexcept
+			RiffChunk& operator=(Vector<DataPtr>&& newdata) noexcept
 			{
 				RiffSize newsize = 0;
 				for (const ConstDataPtr newdatum : newdata)
@@ -345,7 +345,7 @@ namespace json2wav
 		private:
 			ChunkID ckid;
 			RiffSize cksz;
-			std::vector<DataPtr> ckdata;
+			Vector<DataPtr> ckdata;
 		};
 
 		class RiffFile
@@ -491,7 +491,7 @@ namespace json2wav
 				bNeedsValidate = true;
 			}
 
-			void SetChunk(const ChunkID& ckid, std::vector<DataPtr>&& data)
+			void SetChunk(const ChunkID& ckid, Vector<DataPtr>&& data)
 			{
 				auto it = std::find_if(chunks.begin(), chunks.end(),
 					[&ckid](const ConstChunkPtr chunk) { return chunk->GetChunkID() == ckid; });
@@ -540,13 +540,13 @@ namespace json2wav
 				}
 			}
 
-			virtual bool Validate(const RiffSize, const FourCC&, const std::vector<ChunkPtr>&) const = 0;
+			virtual bool Validate(const RiffSize, const FourCC&, const Vector<ChunkPtr>&) const = 0;
 
 		private:
 			std::string filename;
 			RiffSize filesize;
 			FourCC riffid;
-			std::vector<ChunkPtr> chunks;
+			Vector<ChunkPtr> chunks;
 			mutable bool bNeedsValidate;
 			mutable bool bIsValid;
 		};
@@ -567,7 +567,7 @@ namespace json2wav
 			virtual bool Validate(
 				const RiffSize filesize,
 				const FourCC& riffid,
-				const std::vector<ChunkPtr>& chunks) const override
+				const Vector<ChunkPtr>& chunks) const override
 			{
 				return filesize == CalcSize();
 			}

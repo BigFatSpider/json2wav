@@ -182,30 +182,30 @@ namespace json2wav::riff
 		{
 			SetRiffID(FourCC("WAVE"));
 			BytesPtr fmtdataptr(MakePtr<BytesPtr>(GetFmtBytes()));
-			std::vector<DataPtr> fmtdata;
+			Vector<DataPtr> fmtdata;
 			fmtdata.emplace_back(std::move(fmtdataptr));
 			SetChunk(ChunkID("fmt "), std::move(fmtdata));
 		}
 
 		template<typename DataType>
-		void SetData(const std::vector<std::vector<DataType>>& data)
+		void SetData(const Vector<Vector<DataType>>& data)
 		{
 			SetChunk(ChunkID("data"), ToDataPtrVec(data));
 			UpdateSize();
 		}
 
-		void SetData(std::vector<DataPtr>&& data)
+		void SetData(Vector<DataPtr>&& data)
 		{
 			SetChunk(ChunkID("data"), std::move(data));
 			UpdateSize();
 		}
 
 	private:
-		std::vector<Byte> GetFmtBytes() const
+		Vector<Byte> GetFmtBytes() const
 		{
-			std::vector<Byte> fmtbytes;
-			std::vector<Byte> cbsizebytes;
-			std::vector<Byte> extendedbytes;
+			Vector<Byte> fmtbytes;
+			Vector<Byte> cbsizebytes;
+			Vector<Byte> extendedbytes;
 
 			uint16_t cbsize = 0;
 
@@ -285,9 +285,9 @@ namespace json2wav::riff
 		}
 
 		template<typename DataType>
-		std::vector<DataPtr> ToDataPtrVec(const std::vector<std::vector<DataType>>& data)
+		Vector<DataPtr> ToDataPtrVec(const Vector<Vector<DataType>>& data)
 		{
-			std::vector<DataPtr> dpv;
+			Vector<DataPtr> dpv;
 			const int byte_depth = wavfmt.GetBitDepth() >> 3;
 
 			if (sizeof(DataType) != byte_depth)
@@ -296,15 +296,15 @@ namespace json2wav::riff
 			}
 			else if (data.size() > 0)
 			{
-				std::vector<Byte> bytes;
+				Vector<Byte> bytes;
 				bytes.reserve(data.size() * wavfmt.GetNumChannels() * wavfmt.GetBitDepth());
 
 				for (size_t smp = 0; smp < data.size(); ++smp)
 				{
-					const std::vector<DataType>& sample = (data[smp].size() >= wavfmt.GetNumChannels()) ? data[smp] : [this, &data, smp]() -> std::vector<DataType>
+					const Vector<DataType>& sample = (data[smp].size() >= wavfmt.GetNumChannels()) ? data[smp] : [this, &data, smp]() -> Vector<DataType>
 						{
-							std::vector<DataType> concat(data[smp]);
-							std::vector<DataType> empty_samples(wavfmt.GetNumChannels() - data[smp].size(), DataType(0));
+							Vector<DataType> concat(data[smp]);
+							Vector<DataType> empty_samples(wavfmt.GetNumChannels() - data[smp].size(), DataType(0));
 							concat.insert(concat.end(), std::make_move_iterator(empty_samples.begin()), std::make_move_iterator(empty_samples.end()));
 							return concat;
 						}();
@@ -328,7 +328,7 @@ namespace json2wav::riff
 		virtual bool Validate(
 			const RiffSize filesize,
 			const FourCC& riffid,
-			const std::vector<ChunkPtr>& chunks) const override
+			const Vector<ChunkPtr>& chunks) const override
 		{
 			using namespace valid;
 
