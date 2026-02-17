@@ -27,7 +27,7 @@ namespace json2wav::riff
 			virtual bool IsValid() const noexcept = 0;
 		};
 
-		mutable std::vector<const IteratorBase*> iterators;
+		mutable Vector<const IteratorBase*> iterators;
 
 		void AddIterator(const IteratorBase* const it) const
 		{

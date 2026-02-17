@@ -1,6 +1,7 @@
 // Copyright Dan Price 2026.
 
 #include "JsonToWav.h"
+#include "Memory.h"
 #include <vector>
 #include <string>
 
@@ -15,7 +16,7 @@ int main(int argc, char** argv)
 	static const std::string logparam0("-l");
 	static const std::string logparam1("--log");
 	bool bLog = false;
-	std::vector<std::string> filenames;
+	Vector<std::string> filenames;
 	for (int i = 1; i < argc; ++i)
 	{
 		if (logparam0 == argv[i] || logparam1 == argv[i])
