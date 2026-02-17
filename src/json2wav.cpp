@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 	static const std::string logparam0("-l");
 	static const std::string logparam1("--log");
 	bool bLog = false;
-	Vector<std::string> filenames;
+	json2wav::Vector<std::string> filenames;
 	for (int i = 1; i < argc; ++i)
 	{
 		if (logparam0 == argv[i] || logparam1 == argv[i])
