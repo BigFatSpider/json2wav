@@ -15,6 +15,23 @@
 
 namespace json2wav
 {
+	inline constexpr size_t GetAlignmentIndex(size_t Alignment)
+	{
+		switch (Alignment)
+		{
+		case 1: return 0;
+		case 2: return 1;
+		case 4: return 2;
+		case 8: return 3;
+		case 16: return 4;
+		case 32: return 5;
+		default: return 6;
+		}
+	}
+
+	inline constexpr size_t InvalidSize() { return static_cast<size_t>(-1); }
+	inline constexpr uint32_t InvalidUint32() { return static_cast<uint32_t>(-1); }
+
 	template<typename T>
 	inline void CallDestructor(void* Object)
 	{
@@ -31,15 +48,39 @@ namespace json2wav
 		void* Object;
 	};
 
+	struct AllocationTracking
+	{
+		size_t StartByte = InvalidSize();
+		uint32_t NumBytes = 0;
+		uint32_t AlignBytes = 0;
+		uint32_t NumReferences = 0;
+		uint32_t Serial = InvalidUint32();
+	};
+
+	struct AllocationRecycle
+	{
+		uint32_t NumBytes = 0;
+		uint32_t AlignBytes = 0;
+		uint32_t TrackingIndex = InvalidUint32();
+	};
+
+	struct IndexSerial
+	{
+		uint32_t Index = InvalidUint32();
+		uint32_t Serial = InvalidUint32();
+	};
+
 	struct AllocationTransaction
 	{
 		explicit AllocationTransaction(std::shared_mutex& Mutex, std::byte* StorageInit = nullptr)
-			: Lock(Mutex), Storage(StorageInit), Object(nullptr)
+			: Lock(Mutex), Storage(StorageInit), Object(nullptr), TrackingIndex(InvalidUint32())
 		{
 		}
 		std::shared_lock<std::shared_mutex> Lock;
 		std::byte* Storage;
 		void* Object;
+		AllocationTracking Tracking;
+		uint32_t TrackingIndex;
 	};
 
 	class ArenaBumpAllocator
@@ -57,15 +98,123 @@ namespace json2wav
 			return NextByteMutex;
 		}
 
-		static size_t ReserveBytes(size_t NumBytes, size_t AlignBytes)
+		static std::byte** GetBlocks()
 		{
-			size_t StartByte = 0;
+			static std::byte* Blocks[NumBlocks] = { 0 };
+			return &Blocks[0];
+		}
 
+		static std::byte*& GetTrackingBlock()
+		{
+			static std::byte* Block = nullptr;
+			return Block;
+		}
+
+		static std::atomic<uint32_t>& GetTrackingCount()
+		{
+			static std::atomic<uint32_t> Count = 0;
+			return Count;
+		}
+
+		static std::byte*& GetRecycleBlock()
+		{
+			static std::byte* Block = nullptr;
+			return Block;
+		}
+
+		static std::atomic<uint32_t>& GetRecycleCount()
+		{
+			static std::atomic<uint32_t> Count = 0;
+			return Count;
+		}
+
+		static std::mutex& GetBlocksMutex()
+		{
+			static std::mutex Mutex;
+			return Mutex;
+		}
+
+		static std::mutex& GetRecycleMutex()
+		{
+			static std::mutex Mutex;
+			return Mutex;
+		}
+
+		static std::shared_mutex& GetAllocationMutex()
+		{
+			static std::shared_mutex Mutex;
+			return Mutex;
+		}
+
+		static uint32_t NextSerial()
+		{
+			static std::atomic<uint32_t> Serial = 0;
+			return Serial.fetch_add(1);
+		}
+
+		static void RemoveRecycleStackIndexUnsafe(uint32_t RecycleStackIndex)
+		{
+			// The recycle mutex must be locked during this function's execution
+
+			if (AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(GetRecycleBlock()))
 			{
+				const uint32_t RecycleStackLength = GetRecycleCount().load();
+				if (RecycleStackIndex < RecycleStackLength)
+				{
+					for (uint32_t NextStackIndex = RecycleStackIndex + 1; NextStackIndex < RecycleStackLength; ++NextStackIndex)
+					{
+						const uint32_t CurrentStackIndex = NextStackIndex - 1;
+						RecycleStack[CurrentStackIndex] = RecycleStack[NextStackIndex];
+					}
+					RecycleStack[RecycleStackLength - 1].~AllocationRecycle();
+					GetRecycleCount().fetch_sub(1);
+				}
+			}
+		}
+
+		static size_t ReuseAllocation(uint32_t NumBytes, uint32_t AlignBytes, uint32_t& TrackingIndex)
+		{
+			std::unique_lock<std::mutex> Lock(GetRecycleMutex());
+
+			std::byte* RecycleBlock = GetRecycleBlock();
+			std::byte* TrackingBlock = GetTrackingBlock();
+			if (RecycleBlock && TrackingBlock)
+			{
+				AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(RecycleBlock);
+				AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(TrackingBlock);
+				const uint32_t RecycleStackLength = GetRecycleCount().load();
+				const uint32_t TrackingCount = GetTrackingCount().load();
+
+				for (uint32_t FromTop = 0; FromTop < RecycleStackLength; ++FromTop)
+				{
+					const uint32_t RecycleStackIndex = RecycleStackLength - 1 - FromTop;
+					AllocationRecycle& RecycleFrame = RecycleStack[RecycleStackIndex];
+					const bool bAllocationMatches = RecycleFrame.NumBytes == NumBytes && RecycleFrame.AlignBytes == AlignBytes;
+					if (bAllocationMatches && RecycleFrame.TrackingIndex < TrackingCount)
+					{
+						TrackingIndex = RecycleFrame.TrackingIndex;
+						RemoveRecycleStackIndexUnsafe(RecycleStackIndex);
+						return TrackingList[TrackingIndex].StartByte;
+					}
+				}
+			}
+
+			return InvalidSize();
+		}
+
+		static size_t ReserveBytes(uint32_t NumBytes, uint32_t AlignBytes, uint32_t& TrackingIndex)
+		{
+			size_t StartByte = ReuseAllocation(NumBytes, AlignBytes, TrackingIndex);
+
+			if (StartByte == InvalidSize())
+			{
+				TrackingIndex = InvalidUint32();
+
 				std::unique_lock<std::mutex> Lock(GetNextByteMutex());
 
+				const size_t Alignment = AlignBytes;
 				const size_t NextByte = GetNextByte();
-				StartByte = NextByte + ((AlignBytes - (NextByte & (AlignBytes - 1))) & (AlignBytes - 1));
+				StartByte = NextByte + ((Alignment - (NextByte & (Alignment - 1))) & (Alignment - 1));
 				const size_t LastByte = StartByte + NumBytes - 1;
 				const size_t StartBlock = StartByte >> BlockSizeLog2;
 				const size_t LastBlock = LastByte >> BlockSizeLog2;
@@ -80,64 +229,40 @@ namespace json2wav
 			return StartByte;
 		}
 
-		static std::byte** GetBlocks()
-		{
-			static std::byte* Blocks[NumBlocks] = { 0 };
-			return &Blocks[0];
-		}
-
-		static std::byte*& GetDestructorBlock()
-		{
-			static std::byte* Block = nullptr;
-			return Block;
-		}
-
-		static std::atomic<size_t>& GetDestructorCount()
-		{
-			static std::atomic<size_t> DestructorCount = 0;
-			return DestructorCount;
-		}
-
-		static std::mutex& GetBlocksMutex()
-		{
-			static std::mutex BlocksMutex;
-			return BlocksMutex;
-		}
-
-		static std::shared_mutex& GetAllocationMutex()
-		{
-			static std::shared_mutex AllocationMutex;
-			return AllocationMutex;
-		}
-
 	public:
 		static constexpr size_t BlockSizeLog2 = 20ull;
 		static constexpr size_t NumBlocksLog2 = 12ull;
 		static constexpr size_t BlockSize = 1ull << BlockSizeLog2;
 		static constexpr size_t NumBlocks = 1ull << NumBlocksLog2;
-		static constexpr size_t DestructorBlockSize = BlockSize << 4ull;
+		static constexpr size_t TrackingBlockSize = BlockSize << 4ull;
+		static constexpr size_t RecycleBlockSize = TrackingBlockSize >> 1ull;
 		static constexpr size_t MaxByte = 1ull << (BlockSizeLog2 + NumBlocksLog2);
-		static constexpr size_t MaxObjects = DestructorBlockSize / sizeof(DestructorData);
+		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(AllocationTracking);
 
-		static AllocationTransaction Allocate(size_t NumBytes, size_t AlignBytes)
+		static AllocationTransaction Allocate(uint32_t NumBytes, uint32_t AlignBytes)
 		{
 			AllocationTransaction Allocation(GetAllocationMutex());
 
+			// Verify power-of-2 alignment
 			if (AlignBytes & (AlignBytes - 1))
 			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate requires power-of-2 alignment");
 				return Allocation;
 			}
 
+			// Verify size is a multiple of alignment
 			if (NumBytes & (AlignBytes - 1))
 			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate requires size to be a multiple of alignment");
 				return Allocation;
 			}
 
-			const size_t StartByte = ReserveBytes(NumBytes, AlignBytes);
+			const size_t StartByte = ReserveBytes(NumBytes, AlignBytes, Allocation.TrackingIndex);
 			const size_t BlockIndex = StartByte >> BlockSizeLog2;
 			const size_t ByteIndex = StartByte & (BlockSize - 1);
 			if (BlockIndex >= NumBlocks)
 			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate has allocated too many blocks");
 				std::unique_lock<std::mutex> Lock(GetNextByteMutex());
 				GetNextByte() = MaxByte;
 				return Allocation;
@@ -173,66 +298,169 @@ namespace json2wav
 			if (Block)
 			{
 				Allocation.Storage = Block + ByteIndex;
+				Allocation.Tracking.StartByte = StartByte;
+				Allocation.Tracking.NumBytes = NumBytes;
+				Allocation.Tracking.AlignBytes = AlignBytes;
 			}
 
 			return Allocation;
 		}
 
 		template<typename T>
-		static bool AddDestructor(const AllocationTransaction& Allocation)
+		static IndexSerial TrackAllocation(const AllocationTransaction& Allocation)
 		{
 			if (!Allocation.Object)
 			{
-				return false;
+				throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation requires an object to track");
+				return IndexSerial();
 			}
 
-			const size_t DestructorIndex = GetDestructorCount().fetch_add(1);
-			if (DestructorIndex >= MaxObjects)
-			{
-				return false;
-			}
-
-			std::byte* DestructorBlock = GetDestructorBlock();
-			if (!DestructorBlock)
+			std::byte* TrackingBlock = GetTrackingBlock();
+			if (!TrackingBlock)
 			{
 				std::unique_lock<std::mutex> Lock(GetBlocksMutex());
 
-				std::byte*& DestructorBlockRef = GetDestructorBlock();
-				if (!DestructorBlockRef)
+				TrackingBlock = GetTrackingBlock();
+				if (!TrackingBlock)
 				{
-					DestructorBlockRef = reinterpret_cast<std::byte*>(std::aligned_alloc(DestructorBlockSize, DestructorBlockSize));
-					DestructorBlock = DestructorBlockRef;
+					TrackingBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(TrackingBlockSize, TrackingBlockSize));
+				}
+
+				GetTrackingBlock() = TrackingBlock;
+			}
+
+			if (!TrackingBlock)
+			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation could not allocate the tracking block");
+				return IndexSerial();
+			}
+
+			AllocationTracking* Tracking = nullptr;
+			uint32_t TrackingIndex = Allocation.TrackingIndex;
+			if (TrackingIndex == InvalidUint32())
+			{
+				TrackingIndex = GetTrackingCount().fetch_add(1);
+				if (TrackingIndex >= MaxObjects)
+				{
+					throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation is tracking too many objects");
+					return IndexSerial();
+				}
+
+				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
+				Tracking = new(TrackingStorage) AllocationTracking(Allocation.Tracking);
+			}
+			else
+			{
+				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
+				Tracking = reinterpret_cast<AllocationTracking*>(TrackingStorage);
+			}
+
+			Tracking->Serial = NextSerial();
+			return {TrackingIndex, Tracking->Serial};
+		}
+
+		static void RecycleAllocation(uint32_t TrackingIndex)
+		{
+			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			if (!TrackingList)
+			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation needs a tracking list to recycle tracked allocations");
+				return;
+			}
+
+			const uint32_t TrackingCount = GetTrackingCount().load();
+			if (TrackingIndex >= TrackingCount)
+			{
+				throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation needs a valid tracking index to recycle");
+				return;
+			}
+
+			AllocationTracking& Tracking = TrackingList[TrackingIndex];
+
+			std::unique_lock<std::mutex> Lock(GetRecycleMutex());
+
+			std::byte* RecycleBlock = GetRecycleBlock();
+			if (!RecycleBlock)
+			{
+				RecycleBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(RecycleBlockSize, RecycleBlockSize));
+				if (!RecycleBlock)
+				{
+					throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation could not allocate the recycle block");
+					return;
+				}
+
+				GetRecycleBlock() = RecycleBlock;
+			}
+
+			const uint32_t RecycleIndex = GetRecycleCount().fetch_add(1);
+			std::byte* RecycleStorage = RecycleBlock + RecycleIndex * sizeof(AllocationRecycle);
+			new(RecycleStorage) AllocationRecycle{Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
+		}
+
+		static uint32_t IncrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
+		{
+			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			const uint32_t TrackingCount = GetTrackingCount().load();
+			if (TrackingList && TrackingIndex < TrackingCount)
+			{
+				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				if (Tracking.Serial == ObjectSerial)
+				{
+					return Tracking.NumReferences++;
 				}
 			}
+			return InvalidUint32();
+		}
 
-			if (!DestructorBlock)
+		static uint32_t DecrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
+		{
+			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			const uint32_t TrackingCount = GetTrackingCount().load();
+			if (TrackingList && TrackingIndex < TrackingCount)
 			{
-				return false;
+				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				if (Tracking.Serial == ObjectSerial)
+				{
+					return Tracking.NumReferences--;
+				}
 			}
-
-			std::byte* DestructorStorage = DestructorBlock + DestructorIndex * sizeof(DestructorData);
-			new(DestructorStorage) DestructorData(&CallDestructor<T>, Allocation.Object);
-			return true;
+			return InvalidUint32();
 		}
 
 		static void TearDown()
 		{
 			std::unique_lock<std::shared_mutex> AllocationLock(GetAllocationMutex());
 			std::unique_lock<std::mutex> BlocksLock(GetBlocksMutex());
+			std::unique_lock<std::mutex> RecycleLock(GetRecycleMutex());
 
-			// Destroy everything in reverse order
-			if (DestructorData* Destructors = reinterpret_cast<DestructorData*>(GetDestructorBlock()))
+			// Destroy recycle stack in reverse order
+			if (AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(GetRecycleBlock()))
 			{
-				const size_t NumDestructors = GetDestructorCount().load();
-				for (size_t DestructorReverseIndex = 0; DestructorReverseIndex < NumDestructors; ++DestructorReverseIndex)
+				const uint32_t RecycleCount = GetRecycleCount().load();
+				for (uint32_t RecycleReverseIndex = 0; RecycleReverseIndex < RecycleCount; ++RecycleReverseIndex)
 				{
-					const size_t DestructorIndex = NumDestructors - 1 - DestructorReverseIndex;
-					DestructorData& Destructor = Destructors[DestructorIndex];
-					Destructor.Destructor(Destructor.Object);
+					const uint32_t RecycleIndex = RecycleCount - 1 - RecycleReverseIndex;
+					AllocationRecycle& Recycle = RecycleStack[RecycleIndex];
+					Recycle.~AllocationRecycle();
 				}
+				std::free(RecycleStack);
+				GetRecycleBlock() = nullptr;
+				GetRecycleCount().store(0);
+			}
 
-				std::free(Destructors);
-				GetDestructorBlock() = nullptr;
+			// Destroy tracking in reverse order
+			if (AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock()))
+			{
+				const uint32_t TrackingCount = GetTrackingCount().load();
+				for (uint32_t TrackingReverseIndex = 0; TrackingReverseIndex < TrackingCount; ++TrackingReverseIndex)
+				{
+					const uint32_t TrackingIndex = TrackingCount - 1 - TrackingReverseIndex;
+					AllocationTracking& Tracking = TrackingList[TrackingIndex];
+					Tracking.~AllocationTracking();
+				}
+				std::free(TrackingList);
+				GetTrackingBlock() = nullptr;
+				GetTrackingCount().store(0);
 			}
 
 			// Deallocate blocks in reverse order
@@ -315,44 +543,81 @@ namespace json2wav
 	};
 
 	/**
-	 * Smart pointer that defers destruction until the end of the program.
+	 * Copyable smart pointer that defers deallocation until the end of the program.
 	 */
 	template<typename T>
 	class SharedPtr
 	{
 	private:
-		SharedPtr& operator=(T& Reference)
+		void DecrementReference()
+		{
+			const uint32_t DecrementResult = ArenaBumpAllocator::DecrementNumReferences(Index, Serial);
+			if (DecrementResult	== 1)
+			{
+				Pointer->~T();
+				ArenaBumpAllocator::RecycleAllocation(Index);
+				Pointer = nullptr;
+				Index = InvalidUint32();
+				Serial = InvalidUint32();
+			}
+			else if (DecrementResult == InvalidUint32())
+			{
+				Pointer = nullptr;
+				Index = InvalidUint32();
+				Serial = InvalidUint32();
+			}
+		}
+
+		void IncrementReference()
+		{
+			const uint32_t IncrementResult = ArenaBumpAllocator::IncrementNumReferences(Index, Serial);
+			if (IncrementResult == InvalidUint32())
+			{
+				Pointer = nullptr;
+				Index = InvalidUint32();
+				Serial = InvalidUint32();
+			}
+		}
+
+		void Set(T& Reference, uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
 			if (&Reference != Pointer)
 			{
-				const bool bIncrement = !Pointer;
-				Pointer = &Reference;
-				if (bIncrement)
+				if (Pointer)
+				{
+					DecrementReference();
+				}
+				else
 				{
 					PtrCount::Increment();
 				}
+				Pointer = &Reference;
+				Index = TrackingIndex;
+				Serial = ObjectSerial;
+				IncrementReference();
 			}
-
-			return *this;
 		}
 
 	public:
 		template<typename U>
 		SharedPtr(const SharedPtr<U>& Other)
-			: Pointer(Other.Pointer)
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			PtrCount::Increment();
+			IncrementReference();
 		}
 
 		template<typename U>
 		SharedPtr(SharedPtr<U>&& Other) noexcept
-			: Pointer(Other.Pointer)
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			Other.Pointer = nullptr;
+			Other.Index = InvalidUint32();
+			Other.Serial = InvalidUint32();
 		}
 
 		SharedPtr(std::nullptr_t) noexcept
-			: Pointer(nullptr)
+			: Pointer(nullptr), Index(InvalidUint32()), Serial(InvalidUint32())
 		{
 		}
 
@@ -365,6 +630,7 @@ namespace json2wav
 		{
 			if (Pointer)
 			{
+				DecrementReference();
 				PtrCount::Decrement();
 			}
 		}
@@ -374,16 +640,29 @@ namespace json2wav
 		{
 			if (reinterpret_cast<const std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
-				const bool bIncrement = !*this && Other;
-				const bool bDecrement = *this && !Other;
+				const bool bGlobalIncrement = !*this && Other;
+				const bool bGlobalDecrement = *this && !Other;
 
-				Pointer = Other.Pointer;
-
-				if (bIncrement)
+				if (bGlobalIncrement)
 				{
 					PtrCount::Increment();
 				}
-				else if (bDecrement)
+
+				if (Pointer)
+				{
+					DecrementReference();
+				}
+
+				Pointer = Other.Pointer;
+				Index = Other.Index;
+				Serial = Other.Serial;
+
+				if (Pointer)
+				{
+					IncrementReference();
+				}
+
+				if (bGlobalDecrement)
 				{
 					PtrCount::Decrement();
 				}
@@ -393,16 +672,26 @@ namespace json2wav
 		}
 
 		template<typename U>
-		SharedPtr& operator=(SharedPtr<U>&& Other)
+		SharedPtr& operator=(SharedPtr<U>&& Other) noexcept
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
-				const bool bDecrement = static_cast<bool>(*this);
+				const bool bGlobalDecrement = static_cast<bool>(*this);
+
+				if (Pointer)
+				{
+					DecrementReference();
+				}
 
 				Pointer = Other.Pointer;
-				Other.Pointer = nullptr;
+				Index = Other.Index;
+				Serial = Other.Serial;
 
-				if (bDecrement)
+				Other.Pointer = nullptr;
+				Other.Index = InvalidUint32();
+				Other.Serial = InvalidUint32();
+
+				if (bGlobalDecrement)
 				{
 					PtrCount::Decrement();
 				}
@@ -411,13 +700,20 @@ namespace json2wav
 			return *this;
 		}
 
-		SharedPtr& operator=(std::nullptr_t)
+		SharedPtr& operator=(std::nullptr_t) noexcept
 		{
-			const bool bDecrement = static_cast<bool>(*this);
+			const bool bGlobalDecrement = static_cast<bool>(*this);
+
+			if (Pointer)
+			{
+				DecrementReference();
+			}
 
 			Pointer = nullptr;
+			Index = InvalidUint32();
+			Serial = InvalidUint32();
 
-			if (bDecrement)
+			if (bGlobalDecrement)
 			{
 				PtrCount::Decrement();
 			}
@@ -437,10 +733,13 @@ namespace json2wav
 		template<typename U>
 		friend class WeakPtr;
 
-		friend struct PtrOps<T>;
+		template<typename U>
+		friend struct PtrOps;
 
 	private:
 		T* Pointer;
+		uint32_t Index;
+		uint32_t Serial;
 	};
 
 	template<typename T>
@@ -455,9 +754,10 @@ namespace json2wav
 			{
 				T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
 				Allocation.Object = Object;
-				if (ArenaBumpAllocator::AddDestructor<T>(Allocation))
+				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation<T>(Allocation);
+				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
 				{
-					SharedPointer = *Object;
+					SharedPointer.Set(*Object, Tracking.Index, Tracking.Serial);
 				}
 				else
 				{
@@ -483,7 +783,7 @@ namespace json2wav
 
 		if (FromPointer)
 		{
-			ToPointer = static_cast<T&>(*FromPointer);
+			ToPointer.Set(static_cast<T&>(*FromPointer), FromPointer.Index, FromPointer.Serial);
 		}
 
 		return ToPointer;
@@ -496,7 +796,7 @@ namespace json2wav
 	}
 
 	/**
-	 * Smart pointer that doesn't prevent destruction.
+	 * Copyable smart pointer that doesn't prevent deallocation.
 	 */
 	template<typename T>
 	class WeakPtr
@@ -504,32 +804,33 @@ namespace json2wav
 	public:
 		template<typename U>
 		WeakPtr(const WeakPtr<U>& Other) noexcept
-			: Pointer(Other.Pointer)
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 		}
 
 		template<typename U>
 		WeakPtr(WeakPtr<U>&& Other) noexcept
-			: Pointer(Other.Pointer)
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			Other.Pointer = nullptr;
+			Other.Index = InvalidUint32();
+			Other.Serial = InvalidUint32();
 		}
 
 		template<typename U>
-		WeakPtr(const SharedPtr<U>& Other)
-			: Pointer(Other.get())
+		WeakPtr(const SharedPtr<U>& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 		}
 
 		template<typename U>
 		WeakPtr(SharedPtr<U>&& Other) noexcept
-			: Pointer(Other.get())
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
-			Other = nullptr;
 		}
 
 		WeakPtr(std::nullptr_t) noexcept
-			: Pointer(nullptr)
+			: Pointer(nullptr), Index(InvalidUint32()), Serial(InvalidUint32())
 		{
 		}
 
@@ -545,29 +846,34 @@ namespace json2wav
 		template<typename U>
 		WeakPtr& operator=(const WeakPtr<U>& Other)
 		{
-			if (reinterpret_cast<const std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
-			{
-				Pointer = Other.Pointer;
-			}
-
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
 			return *this;
 		}
 
 		template<typename U>
-		WeakPtr& operator=(WeakPtr<U>&& Other)
+		WeakPtr& operator=(WeakPtr<U>&& Other) noexcept
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
 				Pointer = Other.Pointer;
+				Index = Other.Index;
+				Serial = Other.Serial;
+
 				Other.Pointer = nullptr;
+				Other.Index = InvalidUint32();
+				Other.Serial = InvalidUint32();
 			}
 
 			return *this;
 		}
 
-		WeakPtr& operator=(std::nullptr_t)
+		WeakPtr& operator=(std::nullptr_t) noexcept
 		{
 			Pointer = nullptr;
+			Index = InvalidUint32();
+			Serial = InvalidUint32();
 			return *this;
 		}
 
@@ -579,7 +885,7 @@ namespace json2wav
 			{
 				if (PtrCount::GetCount().fetch_add(1) > 0)
 				{
-					SharedPointer = *Pointer;
+					SharedPointer.Set(*Pointer, Index, Serial);
 				}
 				PtrCount::GetCount().fetch_sub(1);
 			}
@@ -592,10 +898,12 @@ namespace json2wav
 
 	private:
 		T* Pointer;
+		uint32_t Index;
+		uint32_t Serial;
 	};
 
 	/**
-	 * Smart pointer that destroys its object on destruction.
+	 * Uncopyable smart pointer that defers deallocation until the end of the program.
 	 */
 	template<typename T>
 	class UniquePtr
@@ -605,9 +913,9 @@ namespace json2wav
 		{
 			if (&Reference != Pointer)
 			{
-				const bool bIncrement = !Pointer;
+				const bool bGlobalIncrement = !Pointer;
 				Pointer = &Reference;
-				if (bIncrement)
+				if (bGlobalIncrement)
 				{
 					PtrCount::Increment();
 				}
@@ -654,9 +962,9 @@ namespace json2wav
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
-				const bool bDecrement = static_cast<bool>(*this);
+				const bool bGlobalDecrement = static_cast<bool>(*this);
 
-				if (bDecrement)
+				if (Pointer)
 				{
 					Pointer->~T();
 				}
@@ -664,7 +972,7 @@ namespace json2wav
 				Pointer = Other.Pointer;
 				Other.Pointer = nullptr;
 
-				if (bDecrement)
+				if (bGlobalDecrement)
 				{
 					PtrCount::Decrement();
 				}
@@ -676,16 +984,16 @@ namespace json2wav
 		template<typename U>
 		UniquePtr& operator=(std::nullptr_t)
 		{
-			const bool bDecrement = static_cast<bool>(*this);
+			const bool bGlobalDecrement = static_cast<bool>(*this);
 
-			if (bDecrement)
+			if (Pointer)
 			{
 				Pointer->~T();
 			}
 
 			Pointer = nullptr;
 
-			if (bDecrement)
+			if (bGlobalDecrement)
 			{
 				PtrCount::Decrement();
 			}

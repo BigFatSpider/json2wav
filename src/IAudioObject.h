@@ -12,6 +12,7 @@
 #include <mutex>
 #include <utility>
 #include <type_traits>
+#include <stdexcept>
 #include <cstdint>
 #include <cstdlib>
 
@@ -230,15 +231,29 @@ namespace json2wav
 	private:
 		void CalculateInputDelays() const
 		{
-			*maxInputDelay = 0;
-			for (const auto& inwkptr : inputs)
-				if (const Utility::StrongPtr_t<IAudioObject, bSmartPtr> inptr = Utility::Lock(inwkptr))
-					if (const size_t inputDelay = inptr->GetSampleDelay(); inputDelay > *maxInputDelay)
-						*maxInputDelay = inputDelay;
-			delays.resize(inputs.size());
-			for (size_t i = 0; i < inputs.size(); ++i)
-				if (const Utility::StrongPtr_t<IAudioObject, bSmartPtr> inptr = Utility::Lock(inputs[i]))
-					delays[i] = *maxInputDelay - inptr->GetSampleDelay();
+			if (!bCalculatingDelay)
+			{
+				struct ScopedBool
+				{
+					ScopedBool(bool& RefInit) : Ref(RefInit) { Ref = true; }
+					~ScopedBool() { Ref = false; }
+					bool& Ref;
+				} ScopedCalculatingDelay(bCalculatingDelay);
+
+				*maxInputDelay = 0;
+				for (const auto& inwkptr : inputs)
+					if (const Utility::StrongPtr_t<IAudioObject, bSmartPtr> inptr = Utility::Lock(inwkptr))
+						if (const size_t inputDelay = inptr->GetSampleDelay(); inputDelay > *maxInputDelay)
+							*maxInputDelay = inputDelay;
+				delays.resize(inputs.size());
+				for (size_t i = 0; i < inputs.size(); ++i)
+					if (const Utility::StrongPtr_t<IAudioObject, bSmartPtr> inptr = Utility::Lock(inputs[i]))
+						delays[i] = *maxInputDelay - inptr->GetSampleDelay();
+			}
+			else
+			{
+				throw std::runtime_error("Mix graph is cyclic");
+			}
 		}
 
 		virtual void JoinChannel(
@@ -255,6 +270,7 @@ namespace json2wav
 		Vector<Sample> work;
 		mutable Vector<size_t> delays;
 		mutable zeroinit_t<size_t> maxInputDelay;
+		mutable bool bCalculatingDelay = false;
 	};
 
 	class AudioSumJoin
