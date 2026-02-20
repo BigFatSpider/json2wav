@@ -12,21 +12,21 @@ namespace json2wav
 	class StaticCircleQueue
 	{
 	public:
-		StaticCircleQueue() : data(reinterpret_cast<T*>(raw_data)), start(0), finish(0) {}
+		StaticCircleQueue() : /*data(reinterpret_cast<T*>(raw_data)),*/ start(0), finish(0) {}
 		StaticCircleQueue(const StaticCircleQueue& other)
-			: data(reinterpret_cast<T*>(raw_data)), start(other.start), finish(other.finish)
+			: /*data(reinterpret_cast<T*>(raw_data)),*/ start(other.start), finish(other.finish)
 		{
 			for (size_t i = start; i != finish; i = (i + 1) & mask)
 			{
-				new(raw_data + i * sizeof(T)) T(other.data[i]);
+				new(raw_data + i * sizeof(T)) T(*reinterpret_cast<T*>(other.raw_data + i * sizeof(T)));
 			}
 		}
 		StaticCircleQueue(StaticCircleQueue&& other) noexcept
-			: data(reinterpret_cast<T*>(raw_data)), start(other.start), finish(other.finish)
+			: /*data(reinterpret_cast<T*>(raw_data)),*/ start(other.start), finish(other.finish)
 		{
 			for (size_t i = start; i != finish; i = (i + 1) & mask)
 			{
-				new(raw_data + i * sizeof(T)) T(std::move(other.data[i]));
+				new(raw_data + i * sizeof(T)) T(std::move(*reinterpret_cast<T*>(other.raw_data + i * sizeof(T))));
 			}
 		}
 		StaticCircleQueue& operator=(const StaticCircleQueue& other)
@@ -50,19 +50,21 @@ namespace json2wav
 				case 0:
 					break;
 				case 1:
-					data[i].~T();
+					reinterpret_cast<T*>(raw_data + i * sizeof(T))->~T();
 					break;
 				case 2:
-					new(raw_data + i * sizeof(T)) T(other.data[i]);
+					new(raw_data + i * sizeof(T)) T(*reinterpret_cast<T*>(other.raw_data + i * sizeof(T)));
 					break;
 				case 3:
-					data[i] = other.data[i];
+					*reinterpret_cast<T*>(raw_data + i * sizeof(T)) = *reinterpret_cast<T*>(other.raw_data + i * sizeof(T));
 					break;
 				}
 			}
 
 			start = other.start;
 			finish = other.finish;
+
+			return *this;
 		}
 		StaticCircleQueue& operator=(StaticCircleQueue&& other) noexcept
 		{
@@ -85,25 +87,31 @@ namespace json2wav
 				case 0:
 					break;
 				case 1:
-					data[i].~T();
+					//data[i].~T();
+					reinterpret_cast<T*>(raw_data + i * sizeof(T))->~T();
 					break;
 				case 2:
-					new(raw_data + i * sizeof(T)) T(std::move(other.data[i]));
+					//new(raw_data + i * sizeof(T)) T(std::move(other.data[i]));
+					new(raw_data + i * sizeof(T)) T(std::move(*reinterpret_cast<T*>(other.raw_data + i * sizeof(T))));
 					break;
 				case 3:
-					data[i] = std::move(other.data[i]);
+					//data[i] = std::move(other.data[i]);
+					*reinterpret_cast<T*>(raw_data + i * sizeof(T)) = std::move(*reinterpret_cast<T*>(other.raw_data + i * sizeof(T)));
 					break;
 				}
 			}
 
 			start = other.start;
 			finish = other.finish;
+
+			return *this;
 		}
 		~StaticCircleQueue() noexcept
 		{
 			for (size_t i = start; i != finish; i = (i + 1) & mask)
 			{
-				data[i].~T();
+				//data[i].~T();
+				reinterpret_cast<T*>(raw_data + i * sizeof(T))->~T();
 			}
 		}
 
@@ -131,8 +139,10 @@ namespace json2wav
 				throw std::logic_error("StaticCircleQueue is empty; couldn't pop");
 			}
 
-			T result(std::move(data[start]));
-			data[start].~T();
+			//T result(std::move(data[start]));
+			//data[start].~T();
+			T result(std::move(*reinterpret_cast<T*>(raw_data + start * sizeof(T))));
+			reinterpret_cast<T*>(raw_data + start * sizeof(T))->~T();
 			start = (start + 1) & mask;
 			return result;
 		}
@@ -144,7 +154,8 @@ namespace json2wav
 				throw std::logic_error("StaticCircleQueue is empty; couldn't pop");
 			}
 
-			data[start].~T();
+			//data[start].~T();
+			reinterpret_cast<T*>(raw_data + start * sizeof(T))->~T();
 			start = (start + 1) & mask;
 		}
 
@@ -155,7 +166,8 @@ namespace json2wav
 				throw std::logic_error("StaticCircleQueue is empty; couldn't peek");
 			}
 
-			return data[start];
+			//return data[start];
+			return *reinterpret_cast<T*>(raw_data + start * sizeof(T));
 		}
 
 		const T& peek(const size_t idx = 0) const
@@ -165,7 +177,8 @@ namespace json2wav
 				throw std::logic_error("StaticCircleQueue is empty; couldn't peek");
 			}
 
-			return data[(start + idx) & mask];
+			//return data[(start + idx) & mask];
+			return *reinterpret_cast<const T*>(raw_data + ((start + idx) & mask) * sizeof(T));
 		}
 
 		size_t size() const noexcept
@@ -183,7 +196,7 @@ namespace json2wav
 
 	private:
 		alignas(T) unsigned char raw_data[num * sizeof(T)];
-		T* data;
+		//T* data;
 		size_t start;
 		size_t finish;
 	};
