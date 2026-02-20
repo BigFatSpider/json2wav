@@ -107,22 +107,20 @@ namespace json2wav
 		reinterpret_cast<T*>(Object)->~T();
 	}
 
-	struct DestructorData
-	{
-		explicit DestructorData(void (*DestructorInit)(void*), void* ObjectInit)
-			: Destructor(DestructorInit), Object(ObjectInit)
-		{
-		}
-		void (*Destructor)(void*);
-		void* Object;
-	};
-
 	struct AllocationTracking
 	{
+		AllocationTracking()
+			: StartByte(InvalidSize()), NumBytes(0), AlignBytes(0), NumReferences(0), Serial(InvalidUint32())
+		{
+		}
+		AllocationTracking(const AllocationTracking& Other)
+			: StartByte(Other.StartByte), NumBytes(Other.NumBytes), AlignBytes(Other.AlignBytes), NumReferences(Other.NumReferences.load()), Serial(Other.Serial)
+		{
+		}
 		size_t StartByte = InvalidSize();
 		uint32_t NumBytes = 0;
 		uint32_t AlignBytes = 0;
-		uint32_t NumReferences = 0;
+		std::atomic<uint32_t> NumReferences = 0;
 		uint32_t Serial = InvalidUint32();
 	};
 

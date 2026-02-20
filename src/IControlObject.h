@@ -486,6 +486,7 @@ namespace json2wav
 						event->Activate(GetHolder(), samplenum);
 					}
 				}
+				GetEventsMap().erase(it);
 			}
 		}
 
