@@ -10,6 +10,8 @@
 #include <shared_mutex>
 #include <atomic>
 #include <new>
+#include <string>
+#include <stdexcept>
 #include <cstdlib>
 #include <cstddef>
 
@@ -230,11 +232,11 @@ namespace json2wav
 		}
 
 	public:
-		static constexpr size_t BlockSizeLog2 = 20ull;
-		static constexpr size_t NumBlocksLog2 = 12ull;
+		static constexpr size_t BlockSizeLog2 = 24ull;
+		static constexpr size_t NumBlocksLog2 = 8ull;
 		static constexpr size_t BlockSize = 1ull << BlockSizeLog2;
 		static constexpr size_t NumBlocks = 1ull << NumBlocksLog2;
-		static constexpr size_t TrackingBlockSize = BlockSize << 4ull;
+		static constexpr size_t TrackingBlockSize = BlockSize << 2ull;
 		static constexpr size_t RecycleBlockSize = TrackingBlockSize >> 1ull;
 		static constexpr size_t MaxByte = 1ull << (BlockSizeLog2 + NumBlocksLog2);
 		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(AllocationTracking);
@@ -243,17 +245,24 @@ namespace json2wav
 		{
 			AllocationTransaction Allocation(GetAllocationMutex());
 
+			if (NumBytes > BlockSize)
+			{
+				std::string requirements("allocations to be " + std::to_string(BlockSize) + " bytes or less, but allocation requested was " + std::to_string(NumBytes) + " bytes");
+				throw std::runtime_error(("ArenaBumpAllocator::Allocate requires " + requirements).c_str());
+				return Allocation;
+			}
+
 			// Verify power-of-2 alignment
 			if (AlignBytes & (AlignBytes - 1))
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate requires power-of-2 alignment");
+				throw std::runtime_error("ArenaBumpAllocator::Allocate requires power-of-2 alignment");
 				return Allocation;
 			}
 
 			// Verify size is a multiple of alignment
 			if (NumBytes & (AlignBytes - 1))
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate requires size to be a multiple of alignment");
+				throw std::runtime_error("ArenaBumpAllocator::Allocate requires size to be a multiple of alignment");
 				return Allocation;
 			}
 
@@ -262,7 +271,7 @@ namespace json2wav
 			const size_t ByteIndex = StartByte & (BlockSize - 1);
 			if (BlockIndex >= NumBlocks)
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::Allocate has allocated too many blocks");
+				throw std::runtime_error("ArenaBumpAllocator::Allocate has allocated too many blocks");
 				std::unique_lock<std::mutex> Lock(GetNextByteMutex());
 				GetNextByte() = MaxByte;
 				return Allocation;
@@ -311,7 +320,7 @@ namespace json2wav
 		{
 			if (!Allocation.Object)
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation requires an object to track");
+				throw std::runtime_error("ArenaBumpAllocator::TrackAllocation requires an object to track");
 				return IndexSerial();
 			}
 
@@ -331,7 +340,7 @@ namespace json2wav
 
 			if (!TrackingBlock)
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation could not allocate the tracking block");
+				throw std::runtime_error("ArenaBumpAllocator::TrackAllocation could not allocate the tracking block");
 				return IndexSerial();
 			}
 
@@ -342,7 +351,7 @@ namespace json2wav
 				TrackingIndex = GetTrackingCount().fetch_add(1);
 				if (TrackingIndex >= MaxObjects)
 				{
-					throw std::bad_alloc();//("ArenaBumpAllocator::TrackAllocation is tracking too many objects");
+					throw std::runtime_error("ArenaBumpAllocator::TrackAllocation is tracking too many objects");
 					return IndexSerial();
 				}
 
@@ -364,14 +373,14 @@ namespace json2wav
 			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
 			if (!TrackingList)
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation needs a tracking list to recycle tracked allocations");
+				throw std::runtime_error("ArenaBumpAllocator::RecycleAllocation needs a tracking list to recycle tracked allocations");
 				return;
 			}
 
 			const uint32_t TrackingCount = GetTrackingCount().load();
 			if (TrackingIndex >= TrackingCount)
 			{
-				throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation needs a valid tracking index to recycle");
+				throw std::runtime_error("ArenaBumpAllocator::RecycleAllocation needs a valid tracking index to recycle");
 				return;
 			}
 
@@ -385,7 +394,7 @@ namespace json2wav
 				RecycleBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(RecycleBlockSize, RecycleBlockSize));
 				if (!RecycleBlock)
 				{
-					throw std::bad_alloc();//("ArenaBumpAllocator::RecycleAllocation could not allocate the recycle block");
+					throw std::runtime_error("ArenaBumpAllocator::RecycleAllocation could not allocate the recycle block");
 					return;
 				}
 
@@ -422,6 +431,21 @@ namespace json2wav
 				if (Tracking.Serial == ObjectSerial)
 				{
 					return Tracking.NumReferences--;
+				}
+			}
+			return InvalidUint32();
+		}
+
+		static uint32_t GetNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
+		{
+			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			const uint32_t TrackingCount = GetTrackingCount().load();
+			if (TrackingList && TrackingIndex < TrackingCount)
+			{
+				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				if (Tracking.Serial == ObjectSerial)
+				{
+					return Tracking.NumReferences;
 				}
 			}
 			return InvalidUint32();
@@ -599,6 +623,21 @@ namespace json2wav
 		}
 
 	public:
+		SharedPtr(const SharedPtr& Other)
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+			PtrCount::Increment();
+			IncrementReference();
+		}
+
+		SharedPtr(SharedPtr&& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+			Other.Pointer = nullptr;
+			Other.Index = InvalidUint32();
+			Other.Serial = InvalidUint32();
+		}
+
 		template<typename U>
 		SharedPtr(const SharedPtr<U>& Other)
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
@@ -633,6 +672,69 @@ namespace json2wav
 				DecrementReference();
 				PtrCount::Decrement();
 			}
+		}
+
+		SharedPtr& operator=(const SharedPtr& Other)
+		{
+			if (reinterpret_cast<const std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
+			{
+				const bool bGlobalIncrement = !*this && Other;
+				const bool bGlobalDecrement = *this && !Other;
+
+				if (bGlobalIncrement)
+				{
+					PtrCount::Increment();
+				}
+
+				if (Pointer)
+				{
+					DecrementReference();
+				}
+
+				Pointer = Other.Pointer;
+				Index = Other.Index;
+				Serial = Other.Serial;
+
+				if (Pointer)
+				{
+					IncrementReference();
+				}
+
+				if (bGlobalDecrement)
+				{
+					PtrCount::Decrement();
+				}
+			}
+
+			return *this;
+		}
+		
+		SharedPtr& operator=(SharedPtr&& Other) noexcept
+		{
+			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
+			{
+				const bool bGlobalDecrement = static_cast<bool>(*this);
+
+				if (Pointer)
+				{
+					DecrementReference();
+				}
+
+				Pointer = Other.Pointer;
+				Index = Other.Index;
+				Serial = Other.Serial;
+
+				Other.Pointer = nullptr;
+				Other.Index = InvalidUint32();
+				Other.Serial = InvalidUint32();
+
+				if (bGlobalDecrement)
+				{
+					PtrCount::Decrement();
+				}
+			}
+
+			return *this;
 		}
 
 		template<typename U>
@@ -758,6 +860,10 @@ namespace json2wav
 				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
 				{
 					SharedPointer.Set(*Object, Tracking.Index, Tracking.Serial);
+					if (ArenaBumpAllocator::GetNumReferences(Tracking.Index, Tracking.Serial) != 1)
+					{
+						throw std::runtime_error("SharedPtr reference count not initialized correctly");
+					}
 				}
 				else
 				{
