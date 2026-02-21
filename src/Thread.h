@@ -12,9 +12,9 @@ namespace json2wav
 	class ThreadSafeStatic
 	{
 	private:
-		static Vector<UniquePtr<T>>& GetStatics()
+		static Vector<SharedPtr<T>>& GetStatics()
 		{
-			static Vector<UniquePtr<T>> statics;
+			static Vector<SharedPtr<T>> statics;
 			return statics;
 		}
 
@@ -42,7 +42,7 @@ namespace json2wav
 			}
 			auto& statics(GetStatics());
 			const size_t idx(statics.size());
-			statics.emplace_back(MakeUnique<T>(std::forward<Ts>(params)...));
+			statics.emplace_back(MakeShared<T>(std::forward<Ts>(params)...));
 			return idx;
 		}
 

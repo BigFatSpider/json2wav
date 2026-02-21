@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <type_traits>
+#include <algorithm>
 #include <cstdlib>
 #include <cstddef>
 
@@ -79,12 +80,26 @@ namespace json2wav
 		Error
 	};
 
-	template<EMemoryLogChannel Channel> struct IsMemoryLogChannelActiveImpl;
-	template<> struct IsMemoryLogChannelActiveImpl<EMemoryLogChannel::Allocation> { static constexpr bool Value = false; };
-	template<> struct IsMemoryLogChannelActiveImpl<EMemoryLogChannel::Tracking> { static constexpr bool Value = true; };
-	template<> struct IsMemoryLogChannelActiveImpl<EMemoryLogChannel::Error> { static constexpr bool Value = true; };
+	template<EMemoryLogChannel Channel> struct MemoryLogChannelProperties;
+	template<> struct MemoryLogChannelProperties<EMemoryLogChannel::Allocation>
+	{
+		static constexpr bool IsActive = false;
+		static constexpr const char* Name = "Allocation";
+	};
+	template<> struct MemoryLogChannelProperties<EMemoryLogChannel::Tracking>
+	{
+		static constexpr bool IsActive = false;
+		static constexpr const char* Name = "Tracking";
+	};
+	template<> struct MemoryLogChannelProperties<EMemoryLogChannel::Error>
+	{
+		static constexpr bool IsActive = true;
+		static constexpr const char* Name = "Error";
+	};
 	template<EMemoryLogChannel Channel>
-	constexpr bool IsMemoryLogChannelActive = IsMemoryLogChannelActiveImpl<Channel>::Value;
+	constexpr bool IsMemoryLogChannelActive = MemoryLogChannelProperties<Channel>::IsActive;
+	template<EMemoryLogChannel Channel>
+	constexpr const char* MemoryLogChannelName = MemoryLogChannelProperties<Channel>::Name;
 
 	template<bool bChannelActive> struct LogMemoryIfActive;
 	template<> struct LogMemoryIfActive<true>
@@ -104,7 +119,7 @@ namespace json2wav
 	template<EMemoryLogChannel Channel, typename... Ts>
 	inline void LogMemory(const Ts&... Snippets)
 	{
-		LogMemoryIfActive<IsMemoryLogChannelActive<Channel>>::Log(Snippets...);
+		LogMemoryIfActive<IsMemoryLogChannelActive<Channel>>::Log(MemoryLogChannelName<Channel>, ": ", Snippets...);
 	}
 
 	inline void MemoryError(const std::string& Message)
@@ -116,20 +131,14 @@ namespace json2wav
 	inline constexpr size_t InvalidSize() { return static_cast<size_t>(-1); }
 	inline constexpr uint32_t InvalidUint32() { return static_cast<uint32_t>(-1); }
 
-	template<typename T>
-	inline void CallDestructor(void* Object)
-	{
-		reinterpret_cast<T*>(Object)->~T();
-	}
-
 	struct AllocationTracking
 	{
 		AllocationTracking()
 			: StartByte(InvalidSize()), NumBytes(0), AlignBytes(0), NumReferences(0), Serial(InvalidUint32())
 		{
 		}
-		AllocationTracking(const AllocationTracking& Other)
-			: StartByte(Other.StartByte), NumBytes(Other.NumBytes), AlignBytes(Other.AlignBytes), NumReferences(Other.NumReferences.load()), Serial(Other.Serial)
+		AllocationTracking(size_t StartByteInit, uint32_t NumBytesInit, uint32_t AlignBytesInit)
+			: StartByte(StartByteInit), NumBytes(NumBytesInit), AlignBytes(AlignBytesInit), NumReferences(0), Serial(InvalidUint32())
 		{
 		}
 		size_t StartByte = InvalidSize();
@@ -141,6 +150,7 @@ namespace json2wav
 
 	struct AllocationRecycle
 	{
+		size_t StartByte = InvalidSize();
 		uint32_t NumBytes = 0;
 		uint32_t AlignBytes = 0;
 		uint32_t TrackingIndex = InvalidUint32();
@@ -155,13 +165,14 @@ namespace json2wav
 	struct AllocationTransaction
 	{
 		explicit AllocationTransaction(std::shared_mutex& Mutex, std::byte* StorageInit = nullptr)
-			: Lock(Mutex), Storage(StorageInit), Object(nullptr), TrackingIndex(InvalidUint32())
+			: Lock(Mutex), Storage(StorageInit), StartByte(InvalidSize()), NumBytes(0), AlignBytes(0), TrackingIndex(InvalidUint32())
 		{
 		}
 		std::shared_lock<std::shared_mutex> Lock;
 		std::byte* Storage;
-		void* Object;
-		AllocationTracking Tracking;
+		size_t StartByte;
+		uint32_t NumBytes;
+		uint32_t AlignBytes;
 		uint32_t TrackingIndex;
 	};
 
@@ -264,7 +275,7 @@ namespace json2wav
 			if (RecycleBlock && TrackingBlock)
 			{
 				AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(RecycleBlock);
-				AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(TrackingBlock);
+				//AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(TrackingBlock);
 				const uint32_t RecycleStackLength = GetRecycleCount().load();
 				const uint32_t TrackingCount = GetTrackingCount().load();
 
@@ -275,10 +286,11 @@ namespace json2wav
 					const bool bAllocationMatches = RecycleFrame.NumBytes == NumBytes && RecycleFrame.AlignBytes == AlignBytes;
 					if (bAllocationMatches && RecycleFrame.TrackingIndex < TrackingCount)
 					{
+						const size_t StartByte = RecycleFrame.StartByte;
 						TrackingIndex = RecycleFrame.TrackingIndex;
 						RemoveRecycleStackIndexUnsafe(RecycleStackIndex);
-						LogMemory<EMemoryLogChannel::Allocation>("Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation at byte number ", TrackingList[TrackingIndex].StartByte, " with tracking index ", TrackingIndex);
-						return TrackingList[TrackingIndex].StartByte;
+						LogMemory<EMemoryLogChannel::Allocation>("Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation at byte number ", StartByte, " with tracking index ", TrackingIndex);
+						return StartByte;
 					}
 				}
 			}
@@ -319,10 +331,10 @@ namespace json2wav
 		static constexpr size_t NumBlocksLog2 = 8ull;
 		static constexpr size_t BlockSize = 1ull << BlockSizeLog2;
 		static constexpr size_t NumBlocks = 1ull << NumBlocksLog2;
-		static constexpr size_t TrackingBlockSize = BlockSize << 2ull;
-		static constexpr size_t RecycleBlockSize = TrackingBlockSize >> 1ull;
+		static constexpr size_t TrackingBlockSize = BlockSize << 6ull;
+		static constexpr size_t RecycleBlockSize = TrackingBlockSize;
 		static constexpr size_t MaxByte = 1ull << (BlockSizeLog2 + NumBlocksLog2);
-		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(AllocationTracking);
+		static constexpr size_t MaxObjects = std::min(TrackingBlockSize / sizeof(AllocationTracking), RecycleBlockSize / sizeof(AllocationRecycle));
 
 		static AllocationTransaction Allocate(uint32_t NumBytes, uint32_t AlignBytes)
 		{
@@ -394,9 +406,9 @@ namespace json2wav
 			if (Block)
 			{
 				Allocation.Storage = Block + ByteIndex;
-				Allocation.Tracking.StartByte = StartByte;
-				Allocation.Tracking.NumBytes = NumBytes;
-				Allocation.Tracking.AlignBytes = AlignBytes;
+				Allocation.StartByte = StartByte;
+				Allocation.NumBytes = NumBytes;
+				Allocation.AlignBytes = AlignBytes;
 			}
 
 			return Allocation;
@@ -405,11 +417,11 @@ namespace json2wav
 		template<typename T>
 		static IndexSerial TrackAllocation(const AllocationTransaction& Allocation)
 		{
-			LogMemory<EMemoryLogChannel::Allocation>("Tracking allocation at byte number ", Allocation.Tracking.StartByte);
+			LogMemory<EMemoryLogChannel::Allocation>("Tracking allocation at byte number ", Allocation.StartByte);
 
-			if (!Allocation.Object)
+			if (Allocation.StartByte == InvalidSize())
 			{
-				MemoryError("ArenaBumpAllocator::TrackAllocation requires an object to track");
+				MemoryError("ArenaBumpAllocator::TrackAllocation requires an allocation to track");
 				return IndexSerial();
 			}
 
@@ -448,7 +460,7 @@ namespace json2wav
 
 				LogMemory<EMemoryLogChannel::Allocation>("Adding tracking at index ", TrackingIndex);
 				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
-				Tracking = new(TrackingStorage) AllocationTracking(Allocation.Tracking);
+				Tracking = new(TrackingStorage) AllocationTracking(Allocation.StartByte, Allocation.NumBytes, Allocation.AlignBytes);
 			}
 			else
 			{
@@ -505,9 +517,16 @@ namespace json2wav
 			}
 
 			const uint32_t RecycleIndex = GetRecycleCount().fetch_add(1);
+			if (RecycleIndex >= MaxObjects)
+			{
+				GetRecycleCount().fetch_sub(1);
+				MemoryError("ArenaBumpAllocator::RecycleAllocation is recycling too many objects");
+				return;
+			}
+
 			LogMemory<EMemoryLogChannel::Tracking>("Recycle stack size is ", RecycleIndex + 1);
 			std::byte* RecycleStorage = RecycleBlock + RecycleIndex * sizeof(AllocationRecycle);
-			new(RecycleStorage) AllocationRecycle{Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
+			new(RecycleStorage) AllocationRecycle{Tracking.StartByte, Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
 		}
 
 		static uint32_t IncrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
@@ -625,15 +644,6 @@ namespace json2wav
 	template<typename T, size_t n>
 	using Array = std::array<T, n>;
 
-	//template<typename T>
-	//using SharedPtr = std::shared_ptr<T>;
-
-	//template<typename T>
-	//using WeakPtr = std::weak_ptr<T>;
-
-	//template<typename T>
-	//using UniquePtr = std::unique_ptr<T>;
-
 	class PtrCount
 	{
 	private:
@@ -657,39 +667,39 @@ namespace json2wav
 		}
 
 		template<typename T>
-		friend class SharedPtr;
+		friend class SharedPtrImpl;
 
 		template<typename T>
-		friend class WeakPtr;
+		friend class WeakPtrImpl;
 
 		template<typename T>
-		friend class UniquePtr;
+		friend class UniquePtrImpl;
 	};
 
 	template<typename T>
-	class SharedPtr;
+	class SharedPtrImpl;
 
 	template<typename T>
-	class UniquePtr;
+	class UniquePtrImpl;
 
 	template<typename T>
 	struct PtrOps
 	{
 		template<typename... Ts>
-		static SharedPtr<T> MakeShared(Ts&&... Params);
+		static SharedPtrImpl<T> MakeShared(Ts&&... Params);
 
 		template<typename... Ts>
-		static UniquePtr<T> MakeUnique(Ts&&... Params);
+		static UniquePtrImpl<T> MakeUnique(Ts&&... Params);
 
 		template<typename FromType>
-		static SharedPtr<T> SharedPtrCast(const SharedPtr<FromType>& FromPointer);
+		static SharedPtrImpl<T> SharedPtrCast(const SharedPtrImpl<FromType>& FromPointer);
 	};
 
 	/**
-	 * Copyable smart pointer that defers deallocation until the end of the program.
+	 * Copyable owning smart pointer that defers deallocation until the end of the program.
 	 */
 	template<typename T>
-	class SharedPtr
+	class SharedPtrImpl
 	{
 	private:
 		void DecrementReference()
@@ -743,14 +753,14 @@ namespace json2wav
 		}
 
 	public:
-		SharedPtr(const SharedPtr& Other)
+		SharedPtrImpl(const SharedPtrImpl& Other)
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			PtrCount::Increment();
 			IncrementReference();
 		}
 
-		SharedPtr(SharedPtr&& Other) noexcept
+		SharedPtrImpl(SharedPtrImpl&& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			Other.Pointer = nullptr;
@@ -759,7 +769,7 @@ namespace json2wav
 		}
 
 		template<typename U>
-		SharedPtr(const SharedPtr<U>& Other)
+		SharedPtrImpl(const SharedPtrImpl<U>& Other)
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			PtrCount::Increment();
@@ -767,7 +777,7 @@ namespace json2wav
 		}
 
 		template<typename U>
-		SharedPtr(SharedPtr<U>&& Other) noexcept
+		SharedPtrImpl(SharedPtrImpl<U>&& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			Other.Pointer = nullptr;
@@ -775,17 +785,17 @@ namespace json2wav
 			Other.Serial = InvalidUint32();
 		}
 
-		SharedPtr(std::nullptr_t) noexcept
+		SharedPtrImpl(std::nullptr_t) noexcept
 			: Pointer(nullptr), Index(InvalidUint32()), Serial(InvalidUint32())
 		{
 		}
 
-		SharedPtr() noexcept
-			: SharedPtr(nullptr)
+		SharedPtrImpl() noexcept
+			: SharedPtrImpl(nullptr)
 		{
 		}
 
-		~SharedPtr() noexcept
+		~SharedPtrImpl() noexcept
 		{
 			if (Pointer)
 			{
@@ -794,7 +804,7 @@ namespace json2wav
 			}
 		}
 
-		SharedPtr& operator=(const SharedPtr& Other)
+		SharedPtrImpl& operator=(const SharedPtrImpl& Other)
 		{
 			if (reinterpret_cast<const std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -829,7 +839,7 @@ namespace json2wav
 			return *this;
 		}
 		
-		SharedPtr& operator=(SharedPtr&& Other) noexcept
+		SharedPtrImpl& operator=(SharedPtrImpl&& Other) noexcept
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -858,7 +868,7 @@ namespace json2wav
 		}
 
 		template<typename U>
-		SharedPtr& operator=(const SharedPtr<U>& Other)
+		SharedPtrImpl& operator=(const SharedPtrImpl<U>& Other)
 		{
 			if (reinterpret_cast<const std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -894,7 +904,7 @@ namespace json2wav
 		}
 
 		template<typename U>
-		SharedPtr& operator=(SharedPtr<U>&& Other) noexcept
+		SharedPtrImpl& operator=(SharedPtrImpl<U>&& Other) noexcept
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -922,7 +932,7 @@ namespace json2wav
 			return *this;
 		}
 
-		SharedPtr& operator=(std::nullptr_t) noexcept
+		SharedPtrImpl& operator=(std::nullptr_t) noexcept
 		{
 			const bool bGlobalDecrement = static_cast<bool>(*this);
 
@@ -950,10 +960,10 @@ namespace json2wav
 		explicit operator bool() const { return static_cast<bool>(Pointer); }
 
 		template<typename U>
-		friend class SharedPtr;
+		friend class SharedPtrImpl;
 
 		template<typename U>
-		friend class WeakPtr;
+		friend class WeakPtrImpl;
 
 		template<typename U>
 		friend struct PtrOps;
@@ -966,29 +976,24 @@ namespace json2wav
 
 	template<typename T>
 	template<typename... Ts>
-	inline SharedPtr<T> PtrOps<T>::MakeShared(Ts&&... Params)
+	inline SharedPtrImpl<T> PtrOps<T>::MakeShared(Ts&&... Params)
 	{
-		SharedPtr<T> SharedPointer(nullptr);
+		SharedPtrImpl<T> SharedPointer(nullptr);
 
 		{
 			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
 			if (Allocation.Storage)
 			{
-				LogMemory<EMemoryLogChannel::Allocation>("Constructing object at byte number ", Allocation.Tracking.StartByte);
-				T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
-				Allocation.Object = Object;
+				LogMemory<EMemoryLogChannel::Allocation>("Constructing object at byte number ", Allocation.StartByte);
 				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation<T>(Allocation);
 				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
 				{
+					T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
 					SharedPointer.Set(*Object, Tracking.Index, Tracking.Serial);
 					if (ArenaBumpAllocator::GetNumReferences(Tracking.Index, Tracking.Serial) != 1)
 					{
 						MemoryError("SharedPtr reference count not initialized correctly");
 					}
-				}
-				else
-				{
-					Object->~T();
 				}
 			}
 		}
@@ -997,46 +1002,50 @@ namespace json2wav
 	}
 
 	template<typename T, typename... Ts>
-	inline SharedPtr<T> MakeShared(Ts&&... Params)
+	inline SharedPtrImpl<T> MakeSharedImpl(Ts&&... Params)
 	{
 		return PtrOps<T>::MakeShared(std::forward<Ts>(Params)...);
 	}
 
 	template<typename T>
 	template<typename FromType>
-	inline SharedPtr<T> PtrOps<T>::SharedPtrCast(const SharedPtr<FromType>& FromPointer)
+	inline SharedPtrImpl<T> PtrOps<T>::SharedPtrCast(const SharedPtrImpl<FromType>& FromPointer)
 	{
-		SharedPtr<T> ToPointer(nullptr);
+		SharedPtrImpl<T> ToPointer(nullptr);
 
 		if (FromPointer)
 		{
-			ToPointer.Set(static_cast<T&>(*FromPointer), FromPointer.Index, FromPointer.Serial);
+			ToPointer.Set(*static_cast<T*>(FromPointer.Pointer), FromPointer.Index, FromPointer.Serial);
 		}
 
 		return ToPointer;
 	}
 
 	template<typename ToType, typename FromType>
-	inline SharedPtr<ToType> SharedPtrCast(const SharedPtr<FromType>& FromPointer)
+	inline SharedPtrImpl<ToType> SharedPtrCastImpl(const SharedPtrImpl<FromType>& FromPointer)
 	{
 		return PtrOps<ToType>::SharedPtrCast(FromPointer);
 	}
 
 	/**
-	 * Copyable smart pointer that doesn't prevent deallocation.
+	 * Copyable non-owning smart pointer that doesn't prevent deallocation.
 	 */
 	template<typename T>
-	class WeakPtr
+	class WeakPtrImpl
 	{
 	public:
-		template<typename U>
-		WeakPtr(const WeakPtr<U>& Other) noexcept
+		WeakPtrImpl(const WeakPtrImpl& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 		}
 
 		template<typename U>
-		WeakPtr(WeakPtr<U>&& Other) noexcept
+		WeakPtrImpl(const WeakPtrImpl<U>& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+		}
+
+		WeakPtrImpl(WeakPtrImpl&& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 			Other.Pointer = nullptr;
@@ -1045,33 +1054,51 @@ namespace json2wav
 		}
 
 		template<typename U>
-		WeakPtr(const SharedPtr<U>& Other) noexcept
+		WeakPtrImpl(WeakPtrImpl<U>&& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+			Other.Pointer = nullptr;
+			Other.Index = InvalidUint32();
+			Other.Serial = InvalidUint32();
+		}
+
+		WeakPtrImpl(const SharedPtrImpl<T>& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 		}
 
 		template<typename U>
-		WeakPtr(SharedPtr<U>&& Other) noexcept
+		WeakPtrImpl(const SharedPtrImpl<U>& Other) noexcept
 			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
 		{
 		}
 
-		WeakPtr(std::nullptr_t) noexcept
+		WeakPtrImpl(SharedPtrImpl<T>&& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+		}
+
+		template<typename U>
+		WeakPtrImpl(SharedPtrImpl<U>&& Other) noexcept
+			: Pointer(Other.Pointer), Index(Other.Index), Serial(Other.Serial)
+		{
+		}
+
+		WeakPtrImpl(std::nullptr_t) noexcept
 			: Pointer(nullptr), Index(InvalidUint32()), Serial(InvalidUint32())
 		{
 		}
 
-		WeakPtr() noexcept
-			: WeakPtr(nullptr)
+		WeakPtrImpl() noexcept
+			: WeakPtrImpl(nullptr)
 		{
 		}
 
-		~WeakPtr() noexcept
+		~WeakPtrImpl() noexcept
 		{
 		}
 
-		template<typename U>
-		WeakPtr& operator=(const WeakPtr<U>& Other)
+		WeakPtrImpl& operator=(const WeakPtrImpl& Other)
 		{
 			Pointer = Other.Pointer;
 			Index = Other.Index;
@@ -1080,7 +1107,15 @@ namespace json2wav
 		}
 
 		template<typename U>
-		WeakPtr& operator=(WeakPtr<U>&& Other) noexcept
+		WeakPtrImpl& operator=(const WeakPtrImpl<U>& Other)
+		{
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
+			return *this;
+		}
+
+		WeakPtrImpl& operator=(WeakPtrImpl&& Other) noexcept
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -1096,7 +1131,58 @@ namespace json2wav
 			return *this;
 		}
 
-		WeakPtr& operator=(std::nullptr_t) noexcept
+		template<typename U>
+		WeakPtrImpl& operator=(WeakPtrImpl<U>&& Other) noexcept
+		{
+			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
+			{
+				Pointer = Other.Pointer;
+				Index = Other.Index;
+				Serial = Other.Serial;
+
+				Other.Pointer = nullptr;
+				Other.Index = InvalidUint32();
+				Other.Serial = InvalidUint32();
+			}
+
+			return *this;
+		}
+
+		WeakPtrImpl& operator=(const SharedPtrImpl<T>& Other)
+		{
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
+			return *this;
+		}
+
+		template<typename U>
+		WeakPtrImpl& operator=(const SharedPtrImpl<U>& Other)
+		{
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
+			return *this;
+		}
+
+		WeakPtrImpl& operator=(SharedPtrImpl<T>&& Other)
+		{
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
+			return *this;
+		}
+
+		template<typename U>
+		WeakPtrImpl& operator=(SharedPtrImpl<U>&& Other)
+		{
+			Pointer = Other.Pointer;
+			Index = Other.Index;
+			Serial = Other.Serial;
+			return *this;
+		}
+
+		WeakPtrImpl& operator=(std::nullptr_t) noexcept
 		{
 			Pointer = nullptr;
 			Index = InvalidUint32();
@@ -1104,9 +1190,9 @@ namespace json2wav
 			return *this;
 		}
 
-		SharedPtr<T> lock() const
+		SharedPtrImpl<T> lock() const
 		{
-			SharedPtr<T> SharedPointer(nullptr);
+			SharedPtrImpl<T> SharedPointer(nullptr);
 
 			if (Pointer)
 			{
@@ -1121,7 +1207,7 @@ namespace json2wav
 		}
 
 		template<typename U>
-		friend class WeakPtr;
+		friend class WeakPtrImpl;
 
 	private:
 		T* Pointer;
@@ -1130,13 +1216,13 @@ namespace json2wav
 	};
 
 	/**
-	 * Uncopyable smart pointer that defers deallocation until the end of the program.
+	 * Uncopyable owning smart pointer that defers deallocation until the end of the program.
 	 */
 	template<typename T>
-	class UniquePtr
+	class UniquePtrImpl
 	{
 	private:
-		UniquePtr& operator=(T& Reference)
+		UniquePtrImpl& operator=(T& Reference)
 		{
 			if (&Reference != Pointer)
 			{
@@ -1152,27 +1238,34 @@ namespace json2wav
 		}
 
 	public:
+		UniquePtrImpl(const UniquePtrImpl& Other) = delete;
 		template<typename U>
-		UniquePtr(const UniquePtr<U>& Other) = delete;
+		UniquePtrImpl(const UniquePtrImpl<U>& Other) = delete;
 
-		template<typename U>
-		UniquePtr(UniquePtr<U>&& Other) noexcept
+		UniquePtrImpl(UniquePtrImpl&& Other) noexcept
 			: Pointer(Other.Pointer)
 		{
 			Other.Pointer = nullptr;
 		}
 
-		UniquePtr(std::nullptr_t) noexcept
+		template<typename U>
+		UniquePtrImpl(UniquePtrImpl<U>&& Other) noexcept
+			: Pointer(Other.Pointer)
+		{
+			Other.Pointer = nullptr;
+		}
+
+		UniquePtrImpl(std::nullptr_t) noexcept
 			: Pointer(nullptr)
 		{
 		}
 
-		UniquePtr() noexcept
-			: UniquePtr(nullptr)
+		UniquePtrImpl() noexcept
+			: UniquePtrImpl(nullptr)
 		{
 		}
 
-		~UniquePtr() noexcept
+		~UniquePtrImpl() noexcept
 		{
 			if (Pointer)
 			{
@@ -1181,11 +1274,12 @@ namespace json2wav
 			}
 		}
 
+		UniquePtrImpl& operator=(const UniquePtrImpl& Other) = delete;
 		template<typename U>
-		UniquePtr& operator=(const UniquePtr<U>& Other) = delete;
+		UniquePtrImpl& operator=(const UniquePtrImpl<U>& Other) = delete;
 
 		template<typename U>
-		UniquePtr& operator=(UniquePtr<U>&& Other)
+		UniquePtrImpl& operator=(UniquePtrImpl<U>&& Other)
 		{
 			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
 			{
@@ -1208,8 +1302,30 @@ namespace json2wav
 			return *this;
 		}
 
-		template<typename U>
-		UniquePtr& operator=(std::nullptr_t)
+		UniquePtrImpl& operator=(UniquePtrImpl&& Other)
+		{
+			if (reinterpret_cast<std::byte*>(&Other) != reinterpret_cast<std::byte*>(this))
+			{
+				const bool bGlobalDecrement = static_cast<bool>(*this);
+
+				if (Pointer)
+				{
+					Pointer->~T();
+				}
+
+				Pointer = Other.Pointer;
+				Other.Pointer = nullptr;
+
+				if (bGlobalDecrement)
+				{
+					PtrCount::Decrement();
+				}
+			}
+
+			return *this;
+		}
+
+		UniquePtrImpl& operator=(std::nullptr_t)
 		{
 			const bool bGlobalDecrement = static_cast<bool>(*this);
 
@@ -1235,7 +1351,7 @@ namespace json2wav
 		explicit operator bool() const { return static_cast<bool>(Pointer); }
 
 		template<typename U>
-		friend class UniquePtr;
+		friend class UniquePtrImpl;
 
 		friend struct PtrOps<T>;
 
@@ -1245,9 +1361,9 @@ namespace json2wav
 
 	template<typename T>
 	template<typename... Ts>
-	inline UniquePtr<T> PtrOps<T>::MakeUnique(Ts&&... Params)
+	inline UniquePtrImpl<T> PtrOps<T>::MakeUnique(Ts&&... Params)
 	{
-		UniquePtr<T> UniquePointer(nullptr);
+		UniquePtrImpl<T> UniquePointer(nullptr);
 
 		{
 			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
@@ -1262,28 +1378,47 @@ namespace json2wav
 	}
 
 	template<typename T, typename... Ts>
-	inline UniquePtr<T> MakeUnique(Ts&&... Params)
+	inline UniquePtrImpl<T> MakeUniqueImpl(Ts&&... Params)
 	{
 		return PtrOps<T>::MakeUnique(std::forward<Ts>(Params)...);
 	}
 
-	/*template<typename T, typename... Ts>
-	inline SharedPtr<T> MakeShared(Ts&&... Params)
-	{
-		return std::make_shared<T>(std::forward<Ts>(Params)...);
-	}
+	template<typename T>
+	using SharedPtr = SharedPtrImpl<T>;
+	//template<typename T>
+	//using SharedPtr = std::shared_ptr<T>;
 
 	template<typename T, typename... Ts>
-	inline UniquePtr<T> MakeUnique(Ts&&... Params)
+	inline SharedPtr<T> MakeShared(Ts&&... Params)
 	{
-		return std::make_unique<T>(std::forward<Ts>(Params)...);
+		return MakeSharedImpl<T>(std::forward<Ts>(Params)...);
+		//return std::make_shared<T>(std::forward<Ts>(Params)...);
 	}
 
 	template<typename ToType, typename FromType>
 	inline SharedPtr<ToType> SharedPtrCast(const SharedPtr<FromType>& Ptr)
 	{
-		return std::static_pointer_cast<ToType>(Ptr);
-	}*/
+		return SharedPtrCastImpl<ToType>(Ptr);
+		//return std::static_pointer_cast<ToType>(Ptr);
+	}
+
+	template<typename T>
+	using WeakPtr = WeakPtrImpl<T>;
+	//template<typename T>
+	//using WeakPtr = std::weak_ptr<T>;
+
+	template<typename T>
+	using UniquePtr = UniquePtrImpl<T>;
+	//template<typename T>
+	//using UniquePtr = std::unique_ptr<T>;
+
+	template<typename T, typename... Ts>
+	inline UniquePtr<T> MakeUnique(Ts&&... Params)
+	{
+		return MakeUniqueImpl<T>(std::forward<Ts>(Params)...);
+		//return std::make_unique<T>(std::forward<Ts>(Params)...);
+	}
+
 }
 
 template<typename LeftType, typename RightType>
