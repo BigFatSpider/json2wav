@@ -424,7 +424,7 @@ namespace json2wav
 			meta(*this, &top), mixer(*this, &top), parts(*this, &top),
 			volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
 			name(nameInit), beatlen(0.0), key(0.0), samplerate(44100), timelen(0.0f),
-			pctrls(MakeUnique<ControlSet>()), ctrls(*pctrls),
+			pctrls(MakeShared<ControlSet>()), ctrls(*pctrls),
 			partdatas(vpartdatas),
 			mainout(MakeShared<BusData>()),
 			currentbus(mainout),
@@ -4214,7 +4214,7 @@ namespace json2wav
 		double key;
 		unsigned long samplerate;
 		float timelen;
-		UniquePtr<ControlSet> pctrls;
+		SharedPtr<ControlSet> pctrls;
 		ControlSet& ctrls;
 		AudioFileOut<> wav;
 		Vector<PartData> vpartdatas;

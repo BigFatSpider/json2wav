@@ -25,20 +25,21 @@ namespace json2wav
 		template<typename T, bool bSmartPtr> struct StrongPtr { using type = Ptr_t<T, true, bSmartPtr>; };
 		template<typename T, bool bSmartPtr> using StrongPtr_t = typename StrongPtr<T, bSmartPtr>::type;
 
-		template<typename T, template<typename> typename P> struct LockFtor
+		/*template<typename T, template<typename> typename P> struct LockFtor;
 		{
 			static SharedPtr<T> Lock(P<T> ptr)
 			{
 				SharedPtr<T> shptr(ptr);
 				return shptr;
 			}
+		};*/
+		template<typename T> struct LockFtor
+		{
+			static SharedPtr<T> Lock(SharedPtr<T> ptr) { return ptr; }
+			static SharedPtr<T> Lock(WeakPtr<T> ptr) { return ptr.lock(); }
 		};
-		template<typename T> struct LockFtor<T, SharedPtr>
-		{ static SharedPtr<T> Lock(SharedPtr<T> ptr) { return ptr; } };
-		template<typename T> struct LockFtor<T, WeakPtr>
-		{ static SharedPtr<T> Lock(WeakPtr<T> ptr) { return ptr.lock(); } };
 		template<typename T, template<typename> typename P>
-		inline SharedPtr<T> Lock(P<T> ptr) { return LockFtor<T, P>::Lock(ptr); }
+		inline SharedPtr<T> Lock(P<T> ptr) { return LockFtor<T>::Lock(ptr); }
 		template<typename T> inline T* Lock(T* ptr) { return ptr; }
 
 		template<typename T>

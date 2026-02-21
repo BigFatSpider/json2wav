@@ -88,13 +88,13 @@ namespace json2wav
 		using BesselFilterState = Filter::FilterState<float, float, Filter::BesselLPLaplace<float, order>, order, numch>;
 
 		template<uint_fast8_t order>
-		UniquePtr<Filter::IFilterState<float, float>> CreateBesselFilterState(const uint_fast8_t numch)
+		SharedPtr<Filter::IFilterState<float, float>> CreateBesselFilterState(const uint_fast8_t numch)
 		{
-			UniquePtr<Filter::IFilterState<float, float>> ptr;
+			SharedPtr<Filter::IFilterState<float, float>> ptr;
 			switch (numch)
 			{
-			case 1: ptr = MakeUnique<BesselFilterState<order, 1>>(); break;
-			case 2: ptr = MakeUnique<BesselFilterState<order, 2>>(); break;
+			case 1: ptr = MakeShared<BesselFilterState<order, 1>>(); break;
+			case 2: ptr = MakeShared<BesselFilterState<order, 2>>(); break;
 			default: break;
 			}
 			return ptr;
@@ -238,7 +238,7 @@ namespace json2wav
 		bool bQueueInitialized;
 		SampleBuf queue;
 		std::function<Sample(const uint_fast8_t, const float)> filter;
-		UniquePtr<Filter::IFilterState<float, float>> filterState;
+		SharedPtr<Filter::IFilterState<float, float>> filterState;
 	};
 }
 
