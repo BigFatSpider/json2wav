@@ -122,9 +122,11 @@ namespace json2wav
 		LogMemoryIfActive<IsMemoryLogChannelActive<Channel>>::Log(MemoryLogChannelName<Channel>, ": ", Snippets...);
 	}
 
+#define LOG_MEMORY(Channel, ...) LogMemory<EMemoryLogChannel::Channel>(__VA_ARGS__)
+
 	inline void MemoryError(const std::string& Message)
 	{
-		LogMemory<EMemoryLogChannel::Error>(Message);
+		LOG_MEMORY(Error, Message);
 		throw std::runtime_error(Message.c_str());
 	}
 
@@ -261,7 +263,7 @@ namespace json2wav
 					}
 					RecycleStack[RecycleStackLength - 1].~AllocationRecycle();
 					const uint32_t RecycleStackSize = GetRecycleCount().fetch_sub(1);
-					LogMemory<EMemoryLogChannel::Tracking>("Recycle stack size is ", RecycleStackSize - 1);
+					LOG_MEMORY(Tracking, "Recycle stack size is ", RecycleStackSize - 1);
 				}
 			}
 		}
@@ -289,7 +291,7 @@ namespace json2wav
 						const size_t StartByte = RecycleFrame.StartByte;
 						TrackingIndex = RecycleFrame.TrackingIndex;
 						RemoveRecycleStackIndexUnsafe(RecycleStackIndex);
-						LogMemory<EMemoryLogChannel::Allocation>("Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation at byte number ", StartByte, " with tracking index ", TrackingIndex);
+						LOG_MEMORY(Allocation, "Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation at byte number ", StartByte, " with tracking index ", TrackingIndex);
 						return StartByte;
 					}
 				}
@@ -319,7 +321,7 @@ namespace json2wav
 					// Start at the beginning of the next block
 					StartByte = LastBlock << BlockSizeLog2;
 				}
-				LogMemory<EMemoryLogChannel::Allocation>("Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment to byte number ", StartByte);
+				LOG_MEMORY(Allocation, "Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment to byte number ", StartByte);
 				GetNextByte() = StartByte + NumBytes;
 			}
 
@@ -340,7 +342,7 @@ namespace json2wav
 		{
 			AllocationTransaction Allocation(GetAllocationMutex());
 
-			LogMemory<EMemoryLogChannel::Allocation>("Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment");
+			LOG_MEMORY(Allocation, "Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment");
 
 			if (NumBytes > BlockSize)
 			{
@@ -384,7 +386,7 @@ namespace json2wav
 				Block = GetBlocks()[BlockIndex];
 				if (!Block)
 				{
-					LogMemory<EMemoryLogChannel::Allocation>("Allocating ", BlockSize, " bytes with ", BlockSize, " byte alignment for block ", BlockIndex);
+					LOG_MEMORY(Allocation, "Allocating ", BlockSize, " bytes with ", BlockSize, " byte alignment for block ", BlockIndex);
 					Block = reinterpret_cast<std::byte*>(std::aligned_alloc(BlockSize, BlockSize));
 					GetBlocks()[BlockIndex] = Block;
 				}
@@ -397,7 +399,7 @@ namespace json2wav
 				NextBlock = GetBlocks()[BlockIndex + 1];
 				if (!NextBlock)
 				{
-					LogMemory<EMemoryLogChannel::Allocation>("Allocating ", BlockSize, " bytes with ", BlockSize, " byte alignment for block ", BlockIndex + 1);
+					LOG_MEMORY(Allocation, "Allocating ", BlockSize, " bytes with ", BlockSize, " byte alignment for block ", BlockIndex + 1);
 					NextBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(BlockSize, BlockSize));
 					GetBlocks()[BlockIndex + 1] = NextBlock;
 				}
@@ -417,7 +419,7 @@ namespace json2wav
 		template<typename T>
 		static IndexSerial TrackAllocation(const AllocationTransaction& Allocation)
 		{
-			LogMemory<EMemoryLogChannel::Allocation>("Tracking allocation at byte number ", Allocation.StartByte);
+			LOG_MEMORY(Allocation, "Tracking allocation at byte number ", Allocation.StartByte);
 
 			if (Allocation.StartByte == InvalidSize())
 			{
@@ -433,7 +435,7 @@ namespace json2wav
 				TrackingBlock = GetTrackingBlock();
 				if (!TrackingBlock)
 				{
-					LogMemory<EMemoryLogChannel::Allocation>("Allocating ", TrackingBlockSize, " bytes with ", TrackingBlockSize, " byte alignment for tracking block");
+					LOG_MEMORY(Allocation, "Allocating ", TrackingBlockSize, " bytes with ", TrackingBlockSize, " byte alignment for tracking block");
 					TrackingBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(TrackingBlockSize, TrackingBlockSize));
 				}
 
@@ -451,20 +453,20 @@ namespace json2wav
 			if (TrackingIndex == InvalidUint32())
 			{
 				TrackingIndex = GetTrackingCount().fetch_add(1);
-				LogMemory<EMemoryLogChannel::Tracking>("Tracking list size is ", TrackingIndex + 1);
+				LOG_MEMORY(Tracking, "Tracking list size is ", TrackingIndex + 1);
 				if (TrackingIndex >= MaxObjects)
 				{
 					MemoryError("ArenaBumpAllocator::TrackAllocation is tracking too many objects");
 					return IndexSerial();
 				}
 
-				LogMemory<EMemoryLogChannel::Allocation>("Adding tracking at index ", TrackingIndex);
+				LOG_MEMORY(Allocation, "Adding tracking at index ", TrackingIndex);
 				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
 				Tracking = new(TrackingStorage) AllocationTracking(Allocation.StartByte, Allocation.NumBytes, Allocation.AlignBytes);
 			}
 			else
 			{
-				LogMemory<EMemoryLogChannel::Allocation>("Reusing tracking at index ", TrackingIndex);
+				LOG_MEMORY(Allocation, "Reusing tracking at index ", TrackingIndex);
 				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
 				Tracking = reinterpret_cast<AllocationTracking*>(TrackingStorage);
 			}
@@ -475,7 +477,7 @@ namespace json2wav
 
 		static void RecycleAllocation(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			LogMemory<EMemoryLogChannel::Allocation>("Recycling allocation with tracking index ", TrackingIndex);
+			LOG_MEMORY(Allocation, "Recycling allocation with tracking index ", TrackingIndex);
 
 			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
 			if (!TrackingList)
@@ -498,14 +500,14 @@ namespace json2wav
 				return;
 			}
 
-			LogMemory<EMemoryLogChannel::Allocation>("Recycling ", Tracking.AlignBytes, " byte aligned ", Tracking.NumBytes, " byte allocation with tracking index ", TrackingIndex);
+			LOG_MEMORY(Allocation, "Recycling ", Tracking.AlignBytes, " byte aligned ", Tracking.NumBytes, " byte allocation with tracking index ", TrackingIndex);
 
 			std::unique_lock<std::mutex> Lock(GetRecycleMutex());
 
 			std::byte* RecycleBlock = GetRecycleBlock();
 			if (!RecycleBlock)
 			{
-				LogMemory<EMemoryLogChannel::Allocation>("Allocating ", RecycleBlockSize, " bytes with ", RecycleBlockSize, " byte alignment for recycle block");
+				LOG_MEMORY(Allocation, "Allocating ", RecycleBlockSize, " bytes with ", RecycleBlockSize, " byte alignment for recycle block");
 				RecycleBlock = reinterpret_cast<std::byte*>(std::aligned_alloc(RecycleBlockSize, RecycleBlockSize));
 				if (!RecycleBlock)
 				{
@@ -524,7 +526,7 @@ namespace json2wav
 				return;
 			}
 
-			LogMemory<EMemoryLogChannel::Tracking>("Recycle stack size is ", RecycleIndex + 1);
+			LOG_MEMORY(Tracking, "Recycle stack size is ", RecycleIndex + 1);
 			std::byte* RecycleStorage = RecycleBlock + RecycleIndex * sizeof(AllocationRecycle);
 			new(RecycleStorage) AllocationRecycle{Tracking.StartByte, Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
 		}
@@ -707,7 +709,7 @@ namespace json2wav
 			const uint32_t DecrementResult = ArenaBumpAllocator::DecrementNumReferences(Index, Serial);
 			if (DecrementResult	== 1)
 			{
-				LogMemory<EMemoryLogChannel::Allocation>("Destructing object at byte number ", ArenaBumpAllocator::GetStartByte(Index, Serial));
+				LOG_MEMORY(Allocation, "Destructing object at byte number ", ArenaBumpAllocator::GetStartByte(Index, Serial));
 				Pointer->~T();
 				ArenaBumpAllocator::RecycleAllocation(Index, Serial);
 				Pointer = nullptr;
@@ -984,7 +986,7 @@ namespace json2wav
 			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
 			if (Allocation.Storage)
 			{
-				LogMemory<EMemoryLogChannel::Allocation>("Constructing object at byte number ", Allocation.StartByte);
+				LOG_MEMORY(Allocation, "Constructing object at byte number ", Allocation.StartByte);
 				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation<T>(Allocation);
 				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
 				{
