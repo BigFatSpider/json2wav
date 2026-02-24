@@ -273,20 +273,17 @@ namespace json2wav
 			std::unique_lock<std::mutex> Lock(GetRecycleMutex());
 
 			std::byte* RecycleBlock = GetRecycleBlock();
-			std::byte* TrackingBlock = GetTrackingBlock();
-			if (RecycleBlock && TrackingBlock)
+			if (RecycleBlock)
 			{
 				AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(RecycleBlock);
-				//AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(TrackingBlock);
 				const uint32_t RecycleStackLength = GetRecycleCount().load();
-				const uint32_t TrackingCount = GetTrackingCount().load();
 
 				for (uint32_t FromTop = 0; FromTop < RecycleStackLength; ++FromTop)
 				{
 					const uint32_t RecycleStackIndex = RecycleStackLength - 1 - FromTop;
 					AllocationRecycle& RecycleFrame = RecycleStack[RecycleStackIndex];
 					const bool bAllocationMatches = RecycleFrame.NumBytes == NumBytes && RecycleFrame.AlignBytes == AlignBytes;
-					if (bAllocationMatches && RecycleFrame.TrackingIndex < TrackingCount)
+					if (bAllocationMatches)
 					{
 						const size_t StartByte = RecycleFrame.StartByte;
 						TrackingIndex = RecycleFrame.TrackingIndex;
