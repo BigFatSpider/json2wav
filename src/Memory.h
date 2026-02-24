@@ -157,13 +157,18 @@ namespace json2wav
 		uint32_t TrackingIndex = InvalidUint32();
 	};
 
-	struct AllocationRecycleStack
+	struct AllocationRecycleStackInfo
 	{
 		uint32_t NumBytes = 0;
 		uint32_t AlignBytes = 0;
-		uint32_t* TrackingIndexStack = nullptr;
 		uint32_t StackSize = 0;
 		uint32_t StackMax = 0;
+	};
+
+	struct AllocationRecycleNode
+	{
+		std::byte* Block = nullptr;
+		AllocationRecycleNode* Next = nullptr;
 	};
 
 	struct IndexSerial
@@ -186,68 +191,34 @@ namespace json2wav
 		uint32_t TrackingIndex;
 	};
 
+#define OPEN_PARENTHESIS (
+#define CLOSE_PARENTHESIS )
+
+#define DEFINE_STATIC_PROPERTY(Type, Name, ...) \
+	static Type& Get##Name() \
+	{ \
+		static Type Name __VA_OPT__(OPEN_PARENTHESIS) __VA_ARGS__ __VA_OPT__(CLOSE_PARENTHESIS); \
+		return Name; \
+	}
+
 	class ArenaBumpAllocator
 	{
 	private:
-		static size_t& GetNextByte()
-		{
-			static size_t NextByte = 0;
-			return NextByte;
-		}
-
-		static std::mutex& GetNextByteMutex()
-		{
-			static std::mutex NextByteMutex;
-			return NextByteMutex;
-		}
-
 		static std::byte** GetBlocks()
 		{
 			static std::byte* Blocks[NumBlocks] = { 0 };
 			return &Blocks[0];
 		}
 
-		static std::byte*& GetTrackingBlock()
-		{
-			static std::byte* Block = nullptr;
-			return Block;
-		}
-
-		static std::atomic<uint32_t>& GetTrackingCount()
-		{
-			static std::atomic<uint32_t> Count = 0;
-			return Count;
-		}
-
-		static std::byte*& GetRecycleBlock()
-		{
-			static std::byte* Block = nullptr;
-			return Block;
-		}
-
-		static std::atomic<uint32_t>& GetRecycleCount()
-		{
-			static std::atomic<uint32_t> Count = 0;
-			return Count;
-		}
-
-		static std::mutex& GetBlocksMutex()
-		{
-			static std::mutex Mutex;
-			return Mutex;
-		}
-
-		static std::mutex& GetRecycleMutex()
-		{
-			static std::mutex Mutex;
-			return Mutex;
-		}
-
-		static std::shared_mutex& GetAllocationMutex()
-		{
-			static std::shared_mutex Mutex;
-			return Mutex;
-		}
+		DEFINE_STATIC_PROPERTY(size_t, NextByte, 0);
+		DEFINE_STATIC_PROPERTY(std::byte*, TrackingBlock, nullptr);
+		DEFINE_STATIC_PROPERTY(std::byte*, RecycleBlock, nullptr);
+		DEFINE_STATIC_PROPERTY(std::atomic<uint32_t>, TrackingCount, 0);
+		DEFINE_STATIC_PROPERTY(std::atomic<uint32_t>, RecycleCount, 0);
+		DEFINE_STATIC_PROPERTY(std::mutex, NextByteMutex);
+		DEFINE_STATIC_PROPERTY(std::mutex, BlocksMutex);
+		DEFINE_STATIC_PROPERTY(std::mutex, RecycleMutex);
+		DEFINE_STATIC_PROPERTY(std::shared_mutex, AllocationMutex);
 
 		static uint32_t NextSerial()
 		{
