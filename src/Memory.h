@@ -152,10 +152,18 @@ namespace json2wav
 
 	struct AllocationRecycle
 	{
-		size_t StartByte = InvalidSize();
 		uint32_t NumBytes = 0;
 		uint32_t AlignBytes = 0;
 		uint32_t TrackingIndex = InvalidUint32();
+	};
+
+	struct AllocationRecycleStack
+	{
+		uint32_t NumBytes = 0;
+		uint32_t AlignBytes = 0;
+		uint32_t* TrackingIndexStack = nullptr;
+		uint32_t StackSize = 0;
+		uint32_t StackMax = 0;
 	};
 
 	struct IndexSerial
@@ -247,29 +255,27 @@ namespace json2wav
 			return Serial.fetch_add(1);
 		}
 
-		static void RemoveRecycleStackIndexUnsafe(uint32_t RecycleStackIndex)
+		static void RemoveRecycleStackIndexUnsafe(AllocationRecycle* RecycleStack, uint32_t RecycleStackLength, uint32_t RecycleStackIndex)
 		{
 			// The recycle mutex must be locked during this function's execution
 
-			if (AllocationRecycle* RecycleStack = reinterpret_cast<AllocationRecycle*>(GetRecycleBlock()))
+			if (RecycleStack && RecycleStackIndex < RecycleStackLength)
 			{
-				const uint32_t RecycleStackLength = GetRecycleCount().load();
-				if (RecycleStackIndex < RecycleStackLength)
+				for (uint32_t NextStackIndex = RecycleStackIndex + 1; NextStackIndex < RecycleStackLength; ++NextStackIndex)
 				{
-					for (uint32_t NextStackIndex = RecycleStackIndex + 1; NextStackIndex < RecycleStackLength; ++NextStackIndex)
-					{
-						const uint32_t CurrentStackIndex = NextStackIndex - 1;
-						RecycleStack[CurrentStackIndex] = RecycleStack[NextStackIndex];
-					}
-					RecycleStack[RecycleStackLength - 1].~AllocationRecycle();
-					const uint32_t RecycleStackSize = GetRecycleCount().fetch_sub(1);
-					LOG_MEMORY(Tracking, "Recycle stack size is ", RecycleStackSize - 1);
+					const uint32_t CurrentStackIndex = NextStackIndex - 1;
+					RecycleStack[CurrentStackIndex] = RecycleStack[NextStackIndex];
 				}
+				RecycleStack[RecycleStackLength - 1].~AllocationRecycle();
+				const uint32_t RecycleStackSize = GetRecycleCount().fetch_sub(1);
+				LOG_MEMORY(Tracking, "Recycle stack size is ", RecycleStackSize - 1);
 			}
 		}
 
-		static size_t ReuseAllocation(uint32_t NumBytes, uint32_t AlignBytes, uint32_t& TrackingIndex)
+		static uint32_t ReuseAllocation(uint32_t NumBytes, uint32_t AlignBytes)
 		{
+			uint32_t TrackingIndex = InvalidUint32();
+
 			std::unique_lock<std::mutex> Lock(GetRecycleMutex());
 
 			std::byte* RecycleBlock = GetRecycleBlock();
@@ -285,42 +291,34 @@ namespace json2wav
 					const bool bAllocationMatches = RecycleFrame.NumBytes == NumBytes && RecycleFrame.AlignBytes == AlignBytes;
 					if (bAllocationMatches)
 					{
-						const size_t StartByte = RecycleFrame.StartByte;
 						TrackingIndex = RecycleFrame.TrackingIndex;
-						RemoveRecycleStackIndexUnsafe(RecycleStackIndex);
-						LOG_MEMORY(Allocation, "Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation at byte number ", StartByte, " with tracking index ", TrackingIndex);
-						return StartByte;
+						RemoveRecycleStackIndexUnsafe(RecycleStack, RecycleStackLength, RecycleStackIndex);
+						LOG_MEMORY(Allocation, "Reusing ", AlignBytes, " byte aligned ", NumBytes, " byte allocation with tracking index ", TrackingIndex);
+						break;
 					}
 				}
 			}
 
-			return InvalidSize();
+			return TrackingIndex;
 		}
 
-		static size_t ReserveBytes(uint32_t NumBytes, uint32_t AlignBytes, uint32_t& TrackingIndex)
+		static size_t ReserveBytes(uint32_t NumBytes, uint32_t AlignBytes)
 		{
-			size_t StartByte = ReuseAllocation(NumBytes, AlignBytes, TrackingIndex);
+			std::unique_lock<std::mutex> Lock(GetNextByteMutex());
 
-			if (StartByte == InvalidSize())
+			const size_t Alignment = AlignBytes;
+			const size_t NextByte = GetNextByte();
+			size_t StartByte = NextByte + ((Alignment - (NextByte & (Alignment - 1))) & (Alignment - 1));
+			const size_t LastByte = StartByte + NumBytes - 1;
+			const size_t StartBlock = StartByte >> BlockSizeLog2;
+			const size_t LastBlock = LastByte >> BlockSizeLog2;
+			if (StartBlock != LastBlock)
 			{
-				TrackingIndex = InvalidUint32();
-
-				std::unique_lock<std::mutex> Lock(GetNextByteMutex());
-
-				const size_t Alignment = AlignBytes;
-				const size_t NextByte = GetNextByte();
-				StartByte = NextByte + ((Alignment - (NextByte & (Alignment - 1))) & (Alignment - 1));
-				const size_t LastByte = StartByte + NumBytes - 1;
-				const size_t StartBlock = StartByte >> BlockSizeLog2;
-				const size_t LastBlock = LastByte >> BlockSizeLog2;
-				if (StartBlock != LastBlock)
-				{
-					// Start at the beginning of the next block
-					StartByte = LastBlock << BlockSizeLog2;
-				}
-				LOG_MEMORY(Allocation, "Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment to byte number ", StartByte);
-				GetNextByte() = StartByte + NumBytes;
+				// Start at the beginning of the next block
+				StartByte = LastBlock << BlockSizeLog2;
 			}
+			LOG_MEMORY(Allocation, "Allocating ", NumBytes, " bytes with ", AlignBytes, " byte alignment to byte number ", StartByte);
+			GetNextByte() = StartByte + NumBytes;
 
 			return StartByte;
 		}
@@ -362,7 +360,22 @@ namespace json2wav
 				return Allocation;
 			}
 
-			const size_t StartByte = ReserveBytes(NumBytes, AlignBytes, Allocation.TrackingIndex);
+			size_t StartByte = InvalidSize();
+			const uint32_t TrackingIndex = ReuseAllocation(NumBytes, AlignBytes);
+			if (TrackingIndex < GetTrackingCount().load())
+			{
+				if (std::byte* TrackingBlock = GetTrackingBlock())
+				{
+					AllocationTracking& Tracking = *reinterpret_cast<AllocationTracking*>(TrackingBlock + TrackingIndex * sizeof(AllocationTracking));
+					StartByte = Tracking.StartByte;
+					Allocation.TrackingIndex = TrackingIndex;
+				}
+			}
+			if (StartByte == InvalidSize())
+			{
+				StartByte = ReserveBytes(NumBytes, AlignBytes);
+			}
+
 			const size_t BlockIndex = StartByte >> BlockSizeLog2;
 			const size_t ByteIndex = StartByte & (BlockSize - 1);
 			if (BlockIndex >= NumBlocks)
@@ -525,7 +538,7 @@ namespace json2wav
 
 			LOG_MEMORY(Tracking, "Recycle stack size is ", RecycleIndex + 1);
 			std::byte* RecycleStorage = RecycleBlock + RecycleIndex * sizeof(AllocationRecycle);
-			new(RecycleStorage) AllocationRecycle{Tracking.StartByte, Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
+			new(RecycleStorage) AllocationRecycle{Tracking.NumBytes, Tracking.AlignBytes, TrackingIndex};
 		}
 
 		static uint32_t IncrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
