@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <fstream>
+#include <type_traits>
 
 namespace json2wav
 {
