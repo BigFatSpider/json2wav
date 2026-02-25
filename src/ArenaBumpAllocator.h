@@ -46,21 +46,6 @@ namespace json2wav
 		uint32_t Serial = InvalidUint32();
 	};
 
-	struct AllocationTransaction
-	{
-		explicit AllocationTransaction(std::shared_mutex& Mutex, std::byte* StorageInit = nullptr)
-			: Lock(Mutex), Storage(StorageInit), StartByte(InvalidSize()), NumBytes(0), AlignBytes(0), TrackingIndex(InvalidUint32()), ObjectSerial(InvalidUint32())
-		{
-		}
-		std::shared_lock<std::shared_mutex> Lock;
-		std::byte* Storage;
-		size_t StartByte;
-		uint32_t NumBytes;
-		uint32_t AlignBytes;
-		uint32_t TrackingIndex;
-		uint32_t ObjectSerial;
-	};
-
 	class ArenaBumpAllocator
 	{
 	private:
