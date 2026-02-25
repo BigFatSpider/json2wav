@@ -39,6 +39,12 @@ namespace json2wav
 	inline constexpr size_t InvalidSize() { return static_cast<size_t>(-1); }
 	inline constexpr uint32_t InvalidUint32() { return static_cast<uint32_t>(-1); }
 
+	struct AllocationSpec
+	{
+		uint32_t NumBytes = 0;
+		uint32_t AlignBytes = 0;
+	};
+
 	struct AllocationTracking
 	{
 		AllocationTracking()
@@ -198,7 +204,7 @@ namespace json2wav
 		static constexpr size_t TrackingBlockSize = BlockSize << 6ull;
 		static constexpr size_t RecycleBlockSize = TrackingBlockSize;
 		static constexpr size_t MaxByte = 1ull << (BlockSizeLog2 + NumBlocksLog2);
-		static constexpr size_t MaxObjects = std::min(TrackingBlockSize / sizeof(AllocationTracking), RecycleBlockSize / sizeof(AllocationRecycle));
+		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(AllocationTracking);
 
 		static AllocationTransaction Allocate(uint32_t NumBytes, uint32_t AlignBytes)
 		{
@@ -293,7 +299,6 @@ namespace json2wav
 			return Allocation;
 		}
 
-		template<typename T>
 		static IndexSerial TrackAllocation(const AllocationTransaction& Allocation)
 		{
 			LOG_MEMORY(Allocation, "Tracking allocation at byte number ", Allocation.StartByte);
@@ -864,7 +869,7 @@ namespace json2wav
 			if (Allocation.Storage)
 			{
 				LOG_MEMORY(Allocation, "Constructing object at byte number ", Allocation.StartByte);
-				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation<T>(Allocation);
+				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation(Allocation);
 				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
 				{
 					T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
