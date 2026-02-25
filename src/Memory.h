@@ -374,18 +374,14 @@ namespace json2wav
 
 		{
 			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
-			if (Allocation.Storage)
+			if (Allocation.Storage && Allocation.TrackingIndex < ArenaBumpAllocator::MaxObjects)
 			{
 				LOG_MEMORY(Allocation, "Constructing object at byte number ", Allocation.StartByte);
-				const IndexSerial Tracking = ArenaBumpAllocator::TrackAllocation(Allocation);
-				if (Tracking.Index < ArenaBumpAllocator::MaxObjects)
+				T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
+				SharedPointer.Set(*Object, Allocation.TrackingIndex, Allocation.ObjectSerial);
+				if (ArenaBumpAllocator::GetNumReferences(Allocation.TrackingIndex, Allocation.ObjectSerial) != 1)
 				{
-					T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
-					SharedPointer.Set(*Object, Tracking.Index, Tracking.Serial);
-					if (ArenaBumpAllocator::GetNumReferences(Tracking.Index, Tracking.Serial) != 1)
-					{
-						MemoryError("SharedPtr reference count not initialized correctly");
-					}
+					MemoryError("SharedPtr reference count not initialized correctly");
 				}
 			}
 		}
