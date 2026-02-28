@@ -16,13 +16,13 @@
 
 namespace json2wav
 {
-	struct AllocationTracking
+	struct ArenaBumpAllocatorTracking
 	{
-		AllocationTracking()
+		ArenaBumpAllocatorTracking()
 			: StartByte(InvalidSize()), NumBytes(0), AlignBytes(0), NumReferences(0), Serial(InvalidUint32())
 		{
 		}
-		AllocationTracking(size_t StartByteInit, uint32_t NumBytesInit, uint32_t AlignBytesInit)
+		ArenaBumpAllocatorTracking(size_t StartByteInit, uint32_t NumBytesInit, uint32_t AlignBytesInit)
 			: StartByte(StartByteInit), NumBytes(NumBytesInit), AlignBytes(AlignBytesInit), NumReferences(0), Serial(InvalidUint32())
 		{
 		}
@@ -147,7 +147,7 @@ namespace json2wav
 		static constexpr size_t TrackingBlockSize = BlockSize << 6ull;
 		static constexpr size_t RecycleBlockSize = TrackingBlockSize;
 		static constexpr size_t MaxByte = 1ull << (BlockSizeLog2 + NumBlocksLog2);
-		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(AllocationTracking);
+		static constexpr size_t MaxObjects = TrackingBlockSize / sizeof(ArenaBumpAllocatorTracking);
 
 		static AllocationTransaction Allocate(uint32_t NumBytes, uint32_t AlignBytes)
 		{
@@ -182,7 +182,7 @@ namespace json2wav
 			{
 				if (std::byte* TrackingBlock = GetTrackingBlock())
 				{
-					AllocationTracking& Tracking = *reinterpret_cast<AllocationTracking*>(TrackingBlock + TrackingIndex * sizeof(AllocationTracking));
+					ArenaBumpAllocatorTracking& Tracking = *reinterpret_cast<ArenaBumpAllocatorTracking*>(TrackingBlock + TrackingIndex * sizeof(ArenaBumpAllocatorTracking));
 					StartByte = Tracking.StartByte;
 					Allocation.TrackingIndex = TrackingIndex;
 				}
@@ -277,7 +277,7 @@ namespace json2wav
 				return IndexSerial();
 			}
 
-			AllocationTracking* Tracking = nullptr;
+			ArenaBumpAllocatorTracking* Tracking = nullptr;
 			uint32_t TrackingIndex = Allocation.TrackingIndex;
 			if (TrackingIndex == InvalidUint32())
 			{
@@ -290,25 +290,25 @@ namespace json2wav
 				}
 
 				LOG_MEMORY(Allocation, "Adding tracking at index ", TrackingIndex);
-				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
-				Tracking = new(TrackingStorage) AllocationTracking(Allocation.StartByte, Allocation.NumBytes, Allocation.AlignBytes);
+				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(ArenaBumpAllocatorTracking);
+				Tracking = new(TrackingStorage) ArenaBumpAllocatorTracking(Allocation.StartByte, Allocation.NumBytes, Allocation.AlignBytes);
 			}
 			else
 			{
 				LOG_MEMORY(Allocation, "Reusing tracking at index ", TrackingIndex);
-				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(AllocationTracking);
-				Tracking = reinterpret_cast<AllocationTracking*>(TrackingStorage);
+				std::byte* TrackingStorage = TrackingBlock + TrackingIndex * sizeof(ArenaBumpAllocatorTracking);
+				Tracking = reinterpret_cast<ArenaBumpAllocatorTracking*>(TrackingStorage);
 			}
 
 			Tracking->Serial = NextSerial();
 			return {TrackingIndex, Tracking->Serial};
 		}
 
-		static void RecycleAllocation(uint32_t TrackingIndex, uint32_t ObjectSerial)
+		static void RecycleAllocation(uint32_t NumBytes, uint32_t AlignBytes, uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
 			LOG_MEMORY(Allocation, "Recycling allocation with tracking index ", TrackingIndex);
 
-			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock());
 			if (!TrackingList)
 			{
 				MemoryError("ArenaBumpAllocator::RecycleAllocation needs a tracking list to recycle tracked allocations");
@@ -322,7 +322,7 @@ namespace json2wav
 				return;
 			}
 
-			AllocationTracking& Tracking = TrackingList[TrackingIndex];
+			ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
 			if (Tracking.Serial != ObjectSerial)
 			{
 				MemoryError("ArenaBumpAllocator::RecycleAllocation needs serial numbers to match");
@@ -362,11 +362,11 @@ namespace json2wav
 
 		static uint32_t IncrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock());
 			const uint32_t TrackingCount = GetTrackingCount().load();
 			if (TrackingList && TrackingIndex < TrackingCount)
 			{
-				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
 				if (Tracking.Serial == ObjectSerial)
 				{
 					return Tracking.NumReferences++;
@@ -377,11 +377,11 @@ namespace json2wav
 
 		static uint32_t DecrementNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock());
 			const uint32_t TrackingCount = GetTrackingCount().load();
 			if (TrackingList && TrackingIndex < TrackingCount)
 			{
-				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
 				if (Tracking.Serial == ObjectSerial)
 				{
 					return Tracking.NumReferences--;
@@ -392,11 +392,11 @@ namespace json2wav
 
 		static uint32_t GetNumReferences(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock());
 			const uint32_t TrackingCount = GetTrackingCount().load();
 			if (TrackingList && TrackingIndex < TrackingCount)
 			{
-				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
 				if (Tracking.Serial == ObjectSerial)
 				{
 					return Tracking.NumReferences;
@@ -405,13 +405,14 @@ namespace json2wav
 			return InvalidUint32();
 		}
 
+		static constexpr bool HasGetStartByte() { return true; }
 		static size_t GetStartByte(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock());
+			ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock());
 			const uint32_t TrackingCount = GetTrackingCount().load();
 			if (TrackingList && TrackingIndex < TrackingCount)
 			{
-				AllocationTracking& Tracking = TrackingList[TrackingIndex];
+				ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
 				if (Tracking.Serial == ObjectSerial)
 				{
 					return Tracking.StartByte;
@@ -442,14 +443,14 @@ namespace json2wav
 			}
 
 			// Destroy tracking in reverse order
-			if (AllocationTracking* TrackingList = reinterpret_cast<AllocationTracking*>(GetTrackingBlock()))
+			if (ArenaBumpAllocatorTracking* TrackingList = reinterpret_cast<ArenaBumpAllocatorTracking*>(GetTrackingBlock()))
 			{
 				const uint32_t TrackingCount = GetTrackingCount().load();
 				for (uint32_t TrackingReverseIndex = 0; TrackingReverseIndex < TrackingCount; ++TrackingReverseIndex)
 				{
 					const uint32_t TrackingIndex = TrackingCount - 1 - TrackingReverseIndex;
-					AllocationTracking& Tracking = TrackingList[TrackingIndex];
-					Tracking.~AllocationTracking();
+					ArenaBumpAllocatorTracking& Tracking = TrackingList[TrackingIndex];
+					Tracking.~ArenaBumpAllocatorTracking();
 				}
 				std::free(TrackingList);
 				GetTrackingBlock() = nullptr;

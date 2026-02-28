@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ArenaBumpAllocator.h"
+#include "CachedArenaAllocator.h"
 #include "MemoryCommon.h"
 #include "Logging.h"
 #include <vector>
@@ -16,6 +17,8 @@
 
 namespace json2wav
 {
+	using ArenaAllocator = CachedArenaAllocator;
+
 	struct AllocationRecycleStackInfo
 	{
 		uint32_t NumBytes = 0;
@@ -54,7 +57,7 @@ namespace json2wav
 		{
 			if (GetCount().fetch_sub(1) == 1)
 			{
-				ArenaBumpAllocator::TearDown();
+				ArenaAllocator::TearDown();
 			}
 		}
 
@@ -96,12 +99,15 @@ namespace json2wav
 	private:
 		void DecrementReference()
 		{
-			const uint32_t DecrementResult = ArenaBumpAllocator::DecrementNumReferences(Index, Serial);
+			const uint32_t DecrementResult = ArenaAllocator::DecrementNumReferences(Index, Serial);
 			if (DecrementResult	== 1)
 			{
-				LOG_MEMORY(Allocation, "Destructing object at byte number ", ArenaBumpAllocator::GetStartByte(Index, Serial));
+				if constexpr (ArenaAllocator::HasGetStartByte())
+				{
+					LOG_MEMORY(Allocation, "Destructing object at byte number ", ArenaAllocator::GetStartByte(Index, Serial));
+				}
 				Pointer->~T();
-				ArenaBumpAllocator::RecycleAllocation(Index, Serial);
+				ArenaAllocator::RecycleAllocation(static_cast<uint32_t>(sizeof(T)), static_cast<uint32_t>(alignof(T)), Index, Serial);
 				Pointer = nullptr;
 				Index = InvalidUint32();
 				Serial = InvalidUint32();
@@ -116,7 +122,7 @@ namespace json2wav
 
 		void IncrementReference()
 		{
-			const uint32_t IncrementResult = ArenaBumpAllocator::IncrementNumReferences(Index, Serial);
+			const uint32_t IncrementResult = ArenaAllocator::IncrementNumReferences(Index, Serial);
 			if (IncrementResult == InvalidUint32())
 			{
 				Pointer = nullptr;
@@ -373,13 +379,15 @@ namespace json2wav
 		SharedPtrImpl<T> SharedPointer(nullptr);
 
 		{
-			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
-			if (Allocation.Storage && Allocation.TrackingIndex < ArenaBumpAllocator::MaxObjects)
+			AllocationTransaction Allocation = ArenaAllocator::Allocate(static_cast<uint32_t>(sizeof(T)), static_cast<uint32_t>(alignof(T)));
+			if (Allocation.Storage && Allocation.TrackingIndex < ArenaAllocator::MaxObjects)
 			{
-				LOG_MEMORY(Allocation, "Constructing object at byte number ", Allocation.StartByte);
+				const uint32_t TrackingIndex = Allocation.TrackingIndex;
+				const uint32_t ObjectSerial = Allocation.ObjectSerial;
+				LOG_MEMORY(Allocation, "Constructing object at index ", TrackingIndex, " with serial ", ObjectSerial);
 				T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);
 				SharedPointer.Set(*Object, Allocation.TrackingIndex, Allocation.ObjectSerial);
-				if (ArenaBumpAllocator::GetNumReferences(Allocation.TrackingIndex, Allocation.ObjectSerial) != 1)
+				if (ArenaAllocator::GetNumReferences(Allocation.TrackingIndex, Allocation.ObjectSerial) != 1)
 				{
 					MemoryError("SharedPtr reference count not initialized correctly");
 				}
@@ -754,7 +762,7 @@ namespace json2wav
 		UniquePtrImpl<T> UniquePointer(nullptr);
 
 		{
-			AllocationTransaction Allocation = ArenaBumpAllocator::Allocate(sizeof(T), alignof(T));
+			AllocationTransaction Allocation = ArenaAllocator::Allocate(static_cast<uint32_t>(sizeof(T)), static_cast<uint32_t>(alignof(T)));
 			if (Allocation.Storage)
 			{
 				T* Object = new(Allocation.Storage) T(std::forward<Ts>(Params)...);

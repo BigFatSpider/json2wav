@@ -6,6 +6,7 @@
 #include <string>
 #include <fstream>
 #include <type_traits>
+#include <utility>
 
 namespace json2wav
 {
@@ -23,42 +24,42 @@ namespace json2wav
 	template<> struct IsArithmetic<false>
 	{
 		template<typename T>
-		static std::string ToString(const T& Snippet)
+		static std::string ToString(T&& Snippet)
 		{
-			std::string StdString(Snippet);
+			std::string StdString(std::forward<T>(Snippet));
 			return StdString;
 		}
 	};
 	template<> struct IsArithmetic<true>
 	{
 		template<typename T>
-		static std::string ToString(const T& Snippet)
+		static std::string ToString(T&& Snippet)
 		{
-			return std::to_string(Snippet);
+			return std::to_string(std::forward<T>(Snippet));
 		}
 	};
 
 	template<typename T>
-	inline std::string ToString(const T& Snippet)
+	inline std::string ToString(T&& Snippet)
 	{
-		return IsArithmetic<std::is_arithmetic_v<T>>::ToString(Snippet);
+		return IsArithmetic<std::is_arithmetic_v<std::remove_reference_t<T>>>::ToString(std::forward<T>(Snippet));
 	}
 
 	template<typename T, typename... Ts>
 	struct VarArgs
 	{
-		static std::string ConcatStrings(const T& Arg, const Ts&... Args)
+		static std::string ConcatStrings(T&& Arg, Ts&&... Args)
 		{
-			return ToString(Arg) + VarArgs<Ts...>::ConcatStrings(Args...);
+			return ToString(std::forward<T>(Arg)) + VarArgs<Ts...>::ConcatStrings(std::forward<Ts>(Args)...);
 		}
 	};
 
 	template<typename T>
 	struct VarArgs<T>
 	{
-		static std::string ConcatStrings(const T& Arg)
+		static std::string ConcatStrings(T&& Arg)
 		{
-			return ToString(Arg);
+			return ToString(std::forward<T>(Arg));
 		}
 	};
 
@@ -94,21 +95,21 @@ namespace json2wav
 	template<> struct LogMemoryIfActive<true>
 	{
 		template<typename... Ts>
-		static void Log(const Ts&... Snippets)
+		static void Log(Ts&&... Snippets)
 		{
-			LogMemoryToFile(VarArgs<Ts...>::ConcatStrings(Snippets...));
+			LogMemoryToFile(VarArgs<Ts...>::ConcatStrings(std::forward<Ts>(Snippets)...));
 		}
 	};
 	template<> struct LogMemoryIfActive<false>
 	{
 		template<typename... Ts>
-		static void Log(const Ts&... Snippets) {}
+		static void Log(Ts&&... Snippets) {}
 	};
 
 	template<EMemoryLogChannel Channel, typename... Ts>
-	inline void LogMemory(const Ts&... Snippets)
+	inline void LogMemory(Ts&&... Snippets)
 	{
-		LogMemoryIfActive<IsMemoryLogChannelActive<Channel>>::Log(MemoryLogChannelName<Channel>, ": ", Snippets...);
+		LogMemoryIfActive<IsMemoryLogChannelActive<Channel>>::Log(MemoryLogChannelName<Channel>, ": ", std::forward<Ts>(Snippets)...);
 	}
 }
 
