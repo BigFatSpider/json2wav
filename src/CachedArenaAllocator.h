@@ -380,7 +380,7 @@ namespace json2wav
 				GetThreadCacheMax() = GetThreadCacheMax() ? GetThreadCacheMax() << 1 : ThreadCacheInitialMax;
 				const size_t NewStorageSize = static_cast<size_t>(GetThreadCacheMax()) * sizeof(AllocationCacheItem);
 
-				BytePtr NewStorage = static_cast<std::byte*>(std::aligned_alloc(NewStorageSize, ThreadCacheInitialMax));
+				BytePtr NewStorage = static_cast<std::byte*>(std::aligned_alloc(ThreadCacheInitialMax, NewStorageSize));
 				if (!NewStorage)
 				{
 					MemoryError("CachedArenaAllocator::IncrementThreadCacheLength couldn't allocate ", NewStorageSize, " bytes with alignment ", ThreadCacheInitialMax);
@@ -405,7 +405,7 @@ namespace json2wav
 				std::scoped_lock<std::mutex> Lock(GetArenaHeadersMutex());
 				if (!GetArenaHeaders())
 				{
-					std::byte* ArenaHeadersStorage = static_cast<std::byte*>(std::aligned_alloc(MaxArenas * sizeof(std::atomic<ArenaHeader*>), alignof(std::atomic<ArenaHeader*>)));
+					std::byte* ArenaHeadersStorage = static_cast<std::byte*>(std::aligned_alloc(alignof(std::atomic<ArenaHeader*>), MaxArenas * sizeof(std::atomic<ArenaHeader*>)));
 					if (!ArenaHeadersStorage)
 					{
 						MemoryError("CachedArenaAllocator::InitArenaHeaders couldn't allocate storage for arena headers");
