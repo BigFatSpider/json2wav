@@ -139,8 +139,8 @@ namespace json2wav
 	};
 
 	constexpr uint64_t AtomicU32Size = sizeof(std::atomic<uint32_t>);
-	constexpr uint64_t AtomicPtrSize = sizeof(std::atomic<std::byte*>);
 	constexpr uint64_t AtomicU32Align = alignof(std::atomic<uint32_t>);
+	constexpr uint64_t AtomicPtrSize = sizeof(std::atomic<std::byte*>);
 
 	struct ArenaHeader
 	{
@@ -153,13 +153,13 @@ namespace json2wav
 		static constexpr uint64_t BlockArraySize = (HeaderSize - NextIndexOffset - 2ull * AtomicU32Size) / AtomicPtrSize;
 		static constexpr uint64_t MaxBlocks = BlockArraySize + 1ull;
 
-		uint32_t NumBytes;
-		uint32_t AlignBytes;
+		const uint32_t NumBytes;
+		const uint32_t AlignBytes;
 		std::atomic<uint32_t> NextIndex;
 		std::atomic<uint32_t> RecycleStackTop;
 		std::atomic<std::byte*> BlockArray[BlockArraySize];
 
-		ArenaHeader(uint32_t NumBytesInit = 0, uint32_t AlignBytesInit = 0)
+		ArenaHeader(uint32_t NumBytesInit, uint32_t AlignBytesInit)
 			: NumBytes(NumBytesInit), AlignBytes(AlignBytesInit), NextIndex(0), RecycleStackTop(InvalidUint32())
 		{
 			for (uint64_t BlockArrayIndex = 0; BlockArrayIndex < BlockArraySize; ++BlockArrayIndex)
@@ -182,10 +182,25 @@ namespace json2wav
 		}
 	};
 
+	inline uint64_t GetArenaStartOffset(uint64_t AlignBytes)
+	{
+		const uint64_t AlignMask = AlignBytes - 1;
+		return sizeof(ArenaHeader) + ((AlignBytes - (sizeof(ArenaHeader) & AlignMask)) & AlignMask);
+	}
+
 	inline uint64_t GetArenaStartOffset(ArenaHeader& Arena)
 	{
-		const uint64_t AlignMask = Arena.AlignBytes - 1;
-		return sizeof(ArenaHeader) + ((Arena.AlignBytes - (sizeof(ArenaHeader) & AlignMask)) & AlignMask);
+		return GetArenaStartOffset(Arena.AlignBytes);
+	}
+
+	inline uint64_t GetBlockSize(uint64_t NumBytes)
+	{
+		return (ArenaHeader::BlockSize / NumBytes) * NumBytes;
+	}
+
+	inline uint64_t GetBlockSize(ArenaHeader& Arena)
+	{
+		return GetBlockSize(Arena.NumBytes);
 	}
 
 	inline std::byte* GetArenaStartByte(ArenaHeader& Arena)
@@ -206,18 +221,11 @@ namespace json2wav
 		if (Index != InvalidUint32())
 		{
 			const uint64_t NumBytes = Arena.NumBytes;
+			const uint64_t BlockSize = GetBlockSize(Arena);
 
-			uint64_t Start = GetArenaStartOffset(Arena) + static_cast<uint64_t>(Index) * NumBytes;
-			uint64_t End = Start + NumBytes;
-			uint64_t StartBlock = Start >> ArenaHeader::BlockSizeLog2;
-			const uint64_t EndBlock = End >> ArenaHeader::BlockSizeLog2;
-			if (StartBlock != EndBlock)
-			{
-				Start = EndBlock << ArenaHeader::BlockSizeLog2;
-				End = Start + NumBytes;
-				StartBlock = EndBlock;
-			}
-			const uint64_t StartByte = Start & ArenaHeader::BlockMask;
+			const uint64_t Start = static_cast<uint64_t>(Index) * NumBytes;
+			const uint64_t StartBlock = Start / BlockSize;
+			const uint64_t StartByte = (StartBlock == 0) * GetArenaStartOffset(Arena) + (Start % BlockSize);
 
 			Location.Block = static_cast<uint32_t>(StartBlock & 0xffffffffull);
 			Location.Byte = static_cast<uint32_t>(StartByte & 0xffffffffull);
@@ -226,14 +234,14 @@ namespace json2wav
 		return Location;
 	}
 
-	inline std::byte* GetArenaBlock(ArenaHeader& Arena, const ArenaLocation& Start)
+	inline std::byte* GetArenaBlock(ArenaHeader& Arena, const ArenaLocation& Location)
 	{
-		if (Start.Block == 0)
+		if (Location.Block == 0)
 		{
 			return reinterpret_cast<std::byte*>(&Arena);
 		}
 
-		const uint32_t BlockArrayIndex = Start.Block - 1;
+		const uint32_t BlockArrayIndex = Location.Block - 1;
 		if (BlockArrayIndex < ArenaHeader::BlockArraySize)
 		{
 			return Arena.BlockArray[BlockArrayIndex];
@@ -244,10 +252,10 @@ namespace json2wav
 
 	inline std::byte* GetArenaAllocationStorage(ArenaHeader& Arena, uint32_t Index)
 	{
-		ArenaLocation Start = GetArenaLocation(Arena, Index);
-		if (std::byte* Block = GetArenaBlock(Arena, Start))
+		ArenaLocation Location = GetArenaLocation(Arena, Index);
+		if (std::byte* Block = GetArenaBlock(Arena, Location))
 		{
-			return Block + Start.Byte;
+			return Block + Location.Byte;
 		}
 		return nullptr;
 	}
@@ -276,23 +284,27 @@ namespace json2wav
 		}
 
 		const uint32_t NextIndex = Arena.NextIndex.fetch_add(1);
-		ArenaLocation Start = GetArenaLocation(Arena, NextIndex);
-		if (Start.Block >= ArenaHeader::MaxBlocks || Start.Byte >= ArenaHeader::BlockSize)
+		ArenaLocation Location = GetArenaLocation(Arena, NextIndex);
+		const uint64_t BlockSize = GetBlockSize(Arena) + (Location.Block == 0) * GetArenaStartOffset(Arena);
+		if (Location.Block >= ArenaHeader::MaxBlocks || Location.Byte >= BlockSize)
 		{
 			MemoryError("AllocateStorage couldn't get a location to allocate storage");
 			return Allocation;
 		}
 
-		std::byte* Block = GetArenaBlock(Arena, Start);
+		std::byte* Block = GetArenaBlock(Arena, Location);
 		if (!Block)
 		{
-			if (Start.Block == 0)
+			if (Location.Block == 0)
 			{
 				MemoryError("AllocateStorage couldn't get the first block???");
 				return Allocation;
 			}
 
-			Block = static_cast<std::byte*>(std::aligned_alloc(ArenaHeader::BlockSize, ArenaHeader::BlockSize));
+			const uint64_t Alignment = Arena.AlignBytes > 8ull ? Arena.AlignBytes : 8ull;
+			const uint64_t AlignmentMask = Alignment - 1ull;
+			const uint64_t AlignmentPadding = (Alignment - (BlockSize & AlignmentMask)) & AlignmentMask;
+			Block = static_cast<std::byte*>(std::aligned_alloc(Alignment, BlockSize + AlignmentPadding));
 			if (!Block)
 			{
 				MemoryError("AllocateStorage couldn't allocate a new block");
@@ -300,10 +312,10 @@ namespace json2wav
 			}
 
 			std::byte* NullStdBytePtr = nullptr;
-			if (!Arena.BlockArray[Start.Block - 1].compare_exchange_strong(NullStdBytePtr, Block))
+			if (!Arena.BlockArray[Location.Block - 1].compare_exchange_strong(NullStdBytePtr, Block))
 			{
 				std::free(Block);
-				Block = Arena.BlockArray[Start.Block - 1].load();
+				Block = Arena.BlockArray[Location.Block - 1].load();
 				if (!Block)
 				{
 					MemoryError("AllocateStorage CAX failed to find null, but then load returned null");
@@ -312,7 +324,7 @@ namespace json2wav
 			}
 		}
 
-		Allocation.Storage = Block + Start.Byte;
+		Allocation.Storage = Block + Location.Byte;
 		Allocation.Index = NextIndex;
 		return Allocation;
 	}
@@ -434,9 +446,19 @@ namespace json2wav
 				}
 			}
 
+			if (NumArenas >= MaxArenas)
+			{
+				MemoryError("CachedArenaAllocator::FindArenaIndex arenas maxed out");
+				return InvalidUint32();
+			}
+
 			// Need a new arena
 			InitArenaHeaders();
-			std::byte* ArenaHeaderBlock = static_cast<std::byte*>(std::aligned_alloc(ArenaHeader::BlockSize, ArenaHeader::BlockSize));
+			const uint64_t Alignment = AlignBytes > alignof(ArenaHeader) ? AlignBytes : alignof(ArenaHeader);
+			const uint64_t AlignmentMask = Alignment - 1ull;
+			const uint64_t HeaderBlockSize = GetBlockSize(NumBytes) + GetArenaStartOffset(AlignBytes);
+			const uint64_t AlignmentPadding = (Alignment - (HeaderBlockSize & AlignmentMask)) & AlignmentMask;
+			std::byte* ArenaHeaderBlock = static_cast<std::byte*>(std::aligned_alloc(Alignment, HeaderBlockSize + AlignmentPadding));
 			if (!ArenaHeaderBlock)
 			{
 				MemoryError("CachedArenaAllocator::FindArenaIndex couldn't allocate an arena");
@@ -521,6 +543,12 @@ namespace json2wav
 			}
 
 			ArenaAllocation TrackingAllocation = AllocateStorage(*TrackingArena);
+			if (!TrackingAllocation.Storage)
+			{
+				MemoryError("CachedArenaAllocator::NewTrackingIndex couldn't allocate tracking storage in the tracking arena");
+				return InvalidUint32();
+			}
+
 			new(TrackingAllocation.Storage) CachedArenaAllocatorTracking(0, Serial, AllocationIndex);
 			return TrackingAllocation.Index;
 		}
