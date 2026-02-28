@@ -12,3 +12,10 @@
 		return Name; \
 	}
 
+#define DEFINE_THREADLOCAL_PROPERTY(Type, Name, ...) \
+	static Type& Get##Name() noexcept \
+	{ \
+		thread_local Type Name __VA_OPT__(OPEN_PARENTHESIS) __VA_ARGS__ __VA_OPT__(CLOSE_PARENTHESIS); \
+		return Name; \
+	}
+

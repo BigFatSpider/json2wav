@@ -6,13 +6,16 @@
 #include <string>
 #include <stdexcept>
 #include <shared_mutex>
+#include <utility>
 #include <cstdint>
 #include <cstddef>
 
 namespace json2wav
 {
-	inline void MemoryError(const std::string& Message)
+	template<typename... Ts>
+	inline void MemoryError(Ts&&... Snippets)
 	{
+		std::string Message = VarArgs<Ts...>::ConcatStrings(std::forward<Ts>(Snippets)...);
 		LOG_MEMORY(Error, Message);
 		throw std::runtime_error(Message.c_str());
 	}
