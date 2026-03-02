@@ -182,7 +182,7 @@ namespace json2wav
 		}
 	};
 
-	inline uint64_t GetArenaStartOffset(uint64_t AlignBytes)
+	inline constexpr uint64_t GetArenaStartOffset(uint64_t AlignBytes)
 	{
 		const uint64_t AlignMask = AlignBytes - 1;
 		return sizeof(ArenaHeader) + ((AlignBytes - (sizeof(ArenaHeader) & AlignMask)) & AlignMask);
@@ -193,7 +193,7 @@ namespace json2wav
 		return GetArenaStartOffset(Arena.AlignBytes);
 	}
 
-	inline uint64_t GetBlockSize(uint64_t NumBytes)
+	inline constexpr uint64_t GetBlockSize(uint64_t NumBytes)
 	{
 		return (ArenaHeader::BlockSize / NumBytes) * NumBytes;
 	}
@@ -531,13 +531,19 @@ namespace json2wav
 				TrackingArena = GetTrackingArena();
 				if (!TrackingArena)
 				{
-					std::byte* TrackingArenaStorage = static_cast<std::byte*>(std::aligned_alloc(ArenaHeader::BlockSize, ArenaHeader::BlockSize));
+					constexpr uint64_t SizeOfTracking = sizeof(CachedArenaAllocatorTracking);
+					constexpr uint64_t AlignOfTracking = alignof(CachedArenaAllocatorTracking);
+					constexpr uint64_t Alignment = AlignOfTracking > alignof(ArenaHeader) ? AlignOfTracking : alignof(ArenaHeader);
+					constexpr uint64_t AlignmentMask = Alignment - 1ull;
+					constexpr uint64_t HeaderBlockSize = GetBlockSize(SizeOfTracking) + GetArenaStartOffset(AlignOfTracking);
+					constexpr uint64_t AlignmentPadding = (Alignment - (HeaderBlockSize & AlignmentMask)) & AlignmentMask;
+					std::byte* TrackingArenaStorage = static_cast<std::byte*>(std::aligned_alloc(Alignment, HeaderBlockSize + AlignmentPadding));
 					if (!TrackingArenaStorage)
 					{
 						MemoryError("CachedArenaAllocator::NewTrackingIndex couldn't allocate storage for the tracking arena");
 						return InvalidUint32();
 					}
-					TrackingArena = new(TrackingArenaStorage) ArenaHeader(sizeof(CachedArenaAllocatorTracking), alignof(CachedArenaAllocatorTracking));
+					TrackingArena = new(TrackingArenaStorage) ArenaHeader(SizeOfTracking, AlignOfTracking);
 					GetTrackingArena() = TrackingArena;
 				}
 			}
