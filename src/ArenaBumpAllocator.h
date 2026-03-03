@@ -304,7 +304,7 @@ namespace json2wav
 			return {TrackingIndex, Tracking->Serial};
 		}
 
-		static void RecycleAllocation(uint32_t NumBytes, uint32_t AlignBytes, uint32_t TrackingIndex, uint32_t ObjectSerial)
+		static void RecycleAllocation(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
 			LOG_MEMORY(Allocation, "Recycling allocation with tracking index ", TrackingIndex);
 
