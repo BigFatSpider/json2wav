@@ -17,6 +17,7 @@
 
 namespace json2wav
 {
+	//using ArenaAllocator = ArenaBumpAllocator;
 	using ArenaAllocator = CachedArenaAllocator;
 
 	struct AllocationRecycleStackInfo
@@ -107,6 +108,7 @@ namespace json2wav
 					LOG_MEMORY(Allocation, "Destructing object at byte number ", ArenaAllocator::GetStartByte(Index, Serial));
 				}
 				Pointer->~T();
+				// sizeof and alignof don't dispatch dynamically, sigh
 				ArenaAllocator::RecycleAllocation(static_cast<uint32_t>(sizeof(T)), static_cast<uint32_t>(alignof(T)), Index, Serial);
 				Pointer = nullptr;
 				Index = InvalidUint32();
