@@ -357,12 +357,13 @@ namespace json2wav
 
 	struct CachedArenaAllocatorTracking
 	{
-		CachedArenaAllocatorTracking(uint32_t NumReferencesInit = 0, uint32_t SerialInit = InvalidUint32(), uint32_t AllocationIndexInit = InvalidUint32())
-			: NumReferences(NumReferencesInit), Serial(SerialInit), AllocationIndex(AllocationIndexInit)
+		CachedArenaAllocatorTracking(uint32_t NumReferencesInit = 0, uint32_t SerialInit = InvalidUint32(), uint32_t ArenaIndexInit = InvalidUint32(), uint32_t AllocationIndexInit = InvalidUint32())
+			: NumReferences(NumReferencesInit), Serial(SerialInit), ArenaIndex(ArenaIndexInit), AllocationIndex(AllocationIndexInit)
 		{
 		}
 		std::atomic<uint32_t> NumReferences;
 		uint32_t Serial;
+		uint32_t ArenaIndex;
 		uint32_t AllocationIndex;
 	};
 
@@ -539,7 +540,7 @@ namespace json2wav
 			return GetThreadCache()[ThreadCacheIndex].ArenaIndex;
 		}
 
-		static uint32_t NewTrackingIndex(uint32_t AllocationIndex, uint32_t Serial)
+		static uint32_t NewTrackingIndex(uint32_t ArenaIndex, uint32_t AllocationIndex, uint32_t Serial)
 		{
 			ArenaHeader* TrackingArena = GetTrackingArena();
 			if (!TrackingArena)
@@ -572,7 +573,7 @@ namespace json2wav
 				return InvalidUint32();
 			}
 
-			new(TrackingAllocation.Storage) CachedArenaAllocatorTracking(0, Serial, AllocationIndex);
+			new(TrackingAllocation.Storage) CachedArenaAllocatorTracking(0, Serial, ArenaIndex, AllocationIndex);
 			return TrackingAllocation.Index;
 		}
 
@@ -630,21 +631,13 @@ namespace json2wav
 			AllocationInfo.ObjectSerial = GetNextSerial().fetch_add(1);
 
 			// Add tracking
-			AllocationInfo.TrackingIndex = NewTrackingIndex(Allocation.Index, AllocationInfo.ObjectSerial);
+			AllocationInfo.TrackingIndex = NewTrackingIndex(ArenaIndex, Allocation.Index, AllocationInfo.ObjectSerial);
 
 			return AllocationInfo;
 		}
 
-		static void RecycleAllocation(uint32_t NumBytes, uint32_t AlignBytes, uint32_t TrackingIndex, uint32_t ObjectSerial)
+		static void RecycleAllocation(uint32_t TrackingIndex, uint32_t ObjectSerial)
 		{
-			const uint32_t ArenaIndex = GetArenaIndex(NumBytes, AlignBytes);
-			ArenaHeader* Arena = ArenaIndex < MaxArenas ? GetArenaHeaders()[ArenaIndex].load() : nullptr;
-			if (!Arena)
-			{
-				MemoryError("CachedArenaAllocator::RecycleAllocation couldn't get an arena");
-				return;
-			}
-
 			ArenaHeader* TrackingArena = GetTrackingArena();
 			if (!TrackingArena)
 			{
@@ -655,6 +648,14 @@ namespace json2wav
 			CachedArenaAllocatorTracking* Tracking = reinterpret_cast<CachedArenaAllocatorTracking*>(GetArenaAllocationStorage(*TrackingArena, TrackingIndex));
 			if (Tracking && Tracking->Serial == ObjectSerial)
 			{
+				const uint32_t ArenaIndex = Tracking->ArenaIndex;
+				ArenaHeader* Arena = ArenaIndex < MaxArenas ? GetArenaHeaders()[ArenaIndex].load() : nullptr;
+				if (!Arena)
+				{
+					MemoryError("CachedArenaAllocator::RecycleAllocation couldn't get the arena");
+					return;
+				}
+
 				const uint32_t AllocationIndex = Tracking->AllocationIndex;
 				Tracking->~CachedArenaAllocatorTracking();
 				RecycleStorage(*TrackingArena, TrackingIndex);
