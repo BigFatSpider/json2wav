@@ -140,6 +140,8 @@ namespace json2wav
 
 	constexpr uint64_t AtomicU32Size = sizeof(std::atomic<uint32_t>);
 	constexpr uint64_t AtomicU32Align = alignof(std::atomic<uint32_t>);
+	constexpr uint64_t AtomicU64Size = sizeof(std::atomic<uint64_t>);
+	constexpr uint64_t AtomicU64Align = alignof(std::atomic<uint64_t>);
 	constexpr uint64_t AtomicPtrSize = sizeof(std::atomic<std::byte*>);
 
 	struct ArenaHeader
@@ -150,13 +152,14 @@ namespace json2wav
 		static constexpr uint64_t HeaderSizeLog2 = 12ull;
 		static constexpr uint64_t HeaderSize = 1ull << HeaderSizeLog2;
 		static constexpr uint64_t NextIndexOffset = AtomicU32Align > 8ull ? AtomicU32Align : 8ull;
-		static constexpr uint64_t BlockArraySize = (HeaderSize - NextIndexOffset - 2ull * AtomicU32Size) / AtomicPtrSize;
+		static constexpr uint64_t RecycleStackTopOffset = AtomicU64Align > NextIndexOffset + AtomicU32Size ? AtomicU64Align : NextIndexOffset + AtomicU32Size;
+		static constexpr uint64_t BlockArraySize = (HeaderSize - RecycleStackTopOffset - AtomicU64Size) / AtomicPtrSize;
 		static constexpr uint64_t MaxBlocks = BlockArraySize + 1ull;
 
 		const uint32_t NumBytes;
 		const uint32_t AlignBytes;
 		std::atomic<uint32_t> NextIndex;
-		std::atomic<uint32_t> RecycleStackTop;
+		std::atomic<uint64_t> RecycleStackTop;
 		std::atomic<std::byte*> BlockArray[BlockArraySize];
 
 		ArenaHeader(uint32_t NumBytesInit, uint32_t AlignBytesInit)
@@ -270,17 +273,21 @@ namespace json2wav
 	{
 		ArenaAllocation Allocation;
 
-		uint32_t RecycleStackTop = Arena.RecycleStackTop.load();
+		uint64_t RecycleStackTopWithState = Arena.RecycleStackTop.load();
+		uint32_t RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
 		while (std::byte* AllocationStorage = GetArenaAllocationStorage(Arena, RecycleStackTop))
 		{
 			const uint32_t RecycleStackNext = ReadUint32(AllocationStorage);
-			if (Arena.RecycleStackTop.compare_exchange_strong(RecycleStackTop, RecycleStackNext))
+			const uint32_t NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
+			const uint64_t RecycleStackNextWithState = static_cast<uint64_t>(RecycleStackNext) | (static_cast<uint64_t>(NextState) << 32);
+			if (Arena.RecycleStackTop.compare_exchange_weak(RecycleStackTopWithState, RecycleStackNextWithState))
 			{
 				Allocation.Storage = AllocationStorage;
 				Allocation.Index = RecycleStackTop;
 				return Allocation;
 			}
-			RecycleStackTop = Arena.RecycleStackTop.load();
+			RecycleStackTopWithState = Arena.RecycleStackTop.load();
+			RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
 		}
 
 		const uint32_t NextIndex = Arena.NextIndex.fetch_add(1);
@@ -333,12 +340,18 @@ namespace json2wav
 	{
 		if (std::byte* Allocation = GetArenaAllocationStorage(Arena, Index))
 		{
+			uint64_t RecycleStackTopWithState = InvalidUint32();
 			uint32_t RecycleStackTop = InvalidUint32();
+			uint32_t NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
+			uint64_t IndexWithState = static_cast<uint64_t>(Index) | (static_cast<uint64_t>(NextState) << 32);
 			do
 			{
-				RecycleStackTop = Arena.RecycleStackTop.load();
+				RecycleStackTopWithState = Arena.RecycleStackTop.load();
+				RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
+				NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
+				IndexWithState = static_cast<uint64_t>(Index) | (static_cast<uint64_t>(NextState) << 32);
 				WriteUint32(Allocation, RecycleStackTop);
-			} while (!Arena.RecycleStackTop.compare_exchange_weak(RecycleStackTop, Index));
+			} while (!Arena.RecycleStackTop.compare_exchange_weak(RecycleStackTopWithState, IndexWithState));
 		}
 	}
 
@@ -468,9 +481,13 @@ namespace json2wav
 			ArenaHeader* Arena = new(ArenaHeaderBlock) ArenaHeader(NumBytes, AlignBytes);
 			uint32_t ArenaIndex = NumArenas;
 			ArenaHeader* NullArenaHeaderPtr = nullptr;
-			while (!GetArenaHeaders()[ArenaIndex].compare_exchange_strong(NullArenaHeaderPtr, Arena))
+			while (!GetArenaHeaders()[ArenaIndex].compare_exchange_weak(NullArenaHeaderPtr, Arena))
 			{
 				ArenaHeader* AddedArena = GetArenaHeaders()[ArenaIndex].load();
+				if (!AddedArena)
+				{
+					continue;
+				}
 				if (AddedArena->NumBytes == NumBytes && AddedArena->AlignBytes == AlignBytes)
 				{
 					Arena->~ArenaHeader();

@@ -421,7 +421,7 @@ namespace json2wav::Filter
 	template<bool bOwner>
 	inline void FilterEvent<bOwner>::Activate(ControlObjectHolder& ctrl, const size_t sampleNum) const
 	{
-		FilterBase<bOwner>& filter = *ctrl.GetPtr<FilterBase<bOwner>>();
+		FilterBase<bOwner>& filter = ctrl.Get<FilterBase<bOwner>>();
 		switch (param)
 		{
 		default:

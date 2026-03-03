@@ -87,7 +87,7 @@ namespace json2wav
 	template<bool bOwner>
 	inline void FaderEvent<bOwner>::Activate(ControlObjectHolder& ctrl, const size_t sampleNum) const
 	{
-		Fader<bOwner>& fader = *ctrl.GetPtr<Fader<bOwner>>();
+		Fader<bOwner>& fader = ctrl.Get<Fader<bOwner>>();
 		fader.SetGainDB(ramp);
 	}
 }
