@@ -17,6 +17,14 @@
 
 namespace json2wav
 {
+
+	template<typename T>
+	using Vector = std::vector<T>;
+
+	template<typename T, size_t n>
+	using Array = std::array<T, n>;
+
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 	//using ArenaAllocator = ArenaBumpAllocator;
 	using ArenaAllocator = CachedArenaAllocator;
 
@@ -33,12 +41,6 @@ namespace json2wav
 		std::byte* Block = nullptr;
 		AllocationRecycleNode* Next = nullptr;
 	};
-
-	template<typename T>
-	using Vector = std::vector<T>;
-
-	template<typename T, size_t n>
-	using Array = std::array<T, n>;
 
 	class PtrCount
 	{
@@ -779,48 +781,69 @@ namespace json2wav
 	{
 		return PtrOps<T>::MakeUnique(std::forward<Ts>(Params)...);
 	}
+#endif // JSON2WAV_CUSTOM_SMARTPTRS
 
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 	template<typename T>
 	using SharedPtr = SharedPtrImpl<T>;
-	//template<typename T>
-	//using SharedPtr = std::shared_ptr<T>;
+#else
+	template<typename T>
+	using SharedPtr = std::shared_ptr<T>;
+#endif
 
 	template<typename T, typename... Ts>
 	inline SharedPtr<T> MakeShared(Ts&&... Params)
 	{
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 		return MakeSharedImpl<T>(std::forward<Ts>(Params)...);
-		//return std::make_shared<T>(std::forward<Ts>(Params)...);
+#else
+		return std::make_shared<T>(std::forward<Ts>(Params)...);
+#endif
 	}
 
 	template<typename ToType, typename FromType>
 	inline SharedPtr<ToType> SharedPtrCast(const SharedPtr<FromType>& Ptr)
 	{
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 		return SharedPtrCastImpl<ToType>(Ptr);
-		//return std::static_pointer_cast<ToType>(Ptr);
+#else
+		return std::static_pointer_cast<ToType>(Ptr);
+#endif
 	}
 
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 	template<typename T>
 	using WeakPtr = WeakPtrImpl<T>;
-	//template<typename T>
-	//using WeakPtr = std::weak_ptr<T>;
+#else
+	template<typename T>
+	using WeakPtr = std::weak_ptr<T>;
+#endif
 
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 	template<typename T>
 	using UniquePtr = UniquePtrImpl<T>;
-	//template<typename T>
-	//using UniquePtr = std::unique_ptr<T>;
+#else
+	template<typename T>
+	using UniquePtr = std::unique_ptr<T>;
+#endif
 
 	template<typename T, typename... Ts>
 	inline UniquePtr<T> MakeUnique(Ts&&... Params)
 	{
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 		return MakeUniqueImpl<T>(std::forward<Ts>(Params)...);
-		//return std::make_unique<T>(std::forward<Ts>(Params)...);
+#else
+		return std::make_unique<T>(std::forward<Ts>(Params)...);
+#endif
 	}
 
 }
 
+#ifdef JSON2WAV_CUSTOM_SMARTPTRS
 template<typename LeftType, typename RightType>
 inline bool operator==(const json2wav::SharedPtr<LeftType>& LeftPointer, const json2wav::SharedPtr<RightType>& RightPointer)
 {
 	return LeftPointer.get() == RightPointer.get();
 }
+#endif
 
