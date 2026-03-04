@@ -142,6 +142,7 @@ namespace json2wav
 	constexpr uint64_t AtomicU32Align = alignof(std::atomic<uint32_t>);
 	constexpr uint64_t AtomicU64Size = sizeof(std::atomic<uint64_t>);
 	constexpr uint64_t AtomicU64Align = alignof(std::atomic<uint64_t>);
+	constexpr uint64_t AtomicU64AlignMask = AtomicU64Align - 1ull;
 	constexpr uint64_t AtomicPtrSize = sizeof(std::atomic<std::byte*>);
 
 	struct ArenaHeader
@@ -151,19 +152,26 @@ namespace json2wav
 		static constexpr uint64_t BlockMask = BlockSize - 1ull;
 		static constexpr uint64_t HeaderSizeLog2 = 12ull;
 		static constexpr uint64_t HeaderSize = 1ull << HeaderSizeLog2;
-		static constexpr uint64_t NextIndexOffset = AtomicU32Align > 8ull ? AtomicU32Align : 8ull;
-		static constexpr uint64_t RecycleStackTopOffset = AtomicU64Align > NextIndexOffset + AtomicU32Size ? AtomicU64Align : NextIndexOffset + AtomicU32Size;
-		static constexpr uint64_t BlockArraySize = (HeaderSize - RecycleStackTopOffset - AtomicU64Size) / AtomicPtrSize;
+		static constexpr uint64_t NextIndexStart = AtomicU32Align > 8ull ? AtomicU32Align : 8ull;
+		static constexpr uint64_t NextIndexEnd = NextIndexStart + AtomicU32Size;
+		static constexpr uint64_t RecycleStack0TopStart = NextIndexEnd + ((AtomicU64Align - (NextIndexEnd & AtomicU64AlignMask)) & AtomicU64AlignMask);
+		static constexpr uint64_t RecycleStack1TopStart = RecycleStack0TopStart + AtomicU64Size;
+		static constexpr uint64_t RecycleStack2TopStart = RecycleStack1TopStart + AtomicU64Size;
+		static constexpr uint64_t RecycleStack3TopStart = RecycleStack2TopStart + AtomicU64Size;
+		static constexpr uint64_t BlockArraySize = (HeaderSize - RecycleStack3TopStart - AtomicU64Size) / AtomicPtrSize;
 		static constexpr uint64_t MaxBlocks = BlockArraySize + 1ull;
 
 		const uint32_t NumBytes;
 		const uint32_t AlignBytes;
 		std::atomic<uint32_t> NextIndex;
-		std::atomic<uint64_t> RecycleStackTop;
+		std::atomic<uint64_t> RecycleStack0Top;
+		std::atomic<uint64_t> RecycleStack1Top;
+		std::atomic<uint64_t> RecycleStack2Top;
+		std::atomic<uint64_t> RecycleStack3Top;
 		std::atomic<std::byte*> BlockArray[BlockArraySize];
 
 		ArenaHeader(uint32_t NumBytesInit, uint32_t AlignBytesInit)
-			: NumBytes(NumBytesInit), AlignBytes(AlignBytesInit), NextIndex(0), RecycleStackTop(InvalidUint32())
+			: NumBytes(NumBytesInit), AlignBytes(AlignBytesInit), NextIndex(0), RecycleStack0Top(InvalidUint32()), RecycleStack1Top(InvalidUint32()), RecycleStack2Top(InvalidUint32()), RecycleStack3Top(InvalidUint32())
 		{
 			for (uint64_t BlockArrayIndex = 0; BlockArrayIndex < BlockArraySize; ++BlockArrayIndex)
 			{
@@ -196,9 +204,14 @@ namespace json2wav
 		return GetArenaStartOffset(Arena.AlignBytes);
 	}
 
-	inline constexpr uint64_t GetBlockSize(uint64_t NumBytes)
+	inline constexpr uint64_t GetBlockSizeNoPadding(uint64_t NumBytes)
 	{
 		return (ArenaHeader::BlockSize / NumBytes) * NumBytes;
+	}
+
+	inline constexpr uint64_t GetBlockSize(uint64_t NumBytes)
+	{
+		return GetBlockSizeNoPadding(NumBytes) < NumBytes ? NumBytes : GetBlockSizeNoPadding(NumBytes);
 	}
 
 	inline uint64_t GetBlockSize(ArenaHeader& Arena)
@@ -269,31 +282,57 @@ namespace json2wav
 		uint32_t Index = InvalidUint32();
 	};
 
-	inline ArenaAllocation AllocateStorage(ArenaHeader& Arena)
+	inline bool PopRecycleStack(ArenaHeader& Arena, std::atomic<uint64_t>& RecycleStackTopAtomic, ArenaAllocation& Allocation)
 	{
-		ArenaAllocation Allocation;
-
-		uint64_t RecycleStackTopWithState = Arena.RecycleStackTop.load();
+		uint64_t RecycleStackTopWithState = RecycleStackTopAtomic.load();
 		uint32_t RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
-		while (std::byte* AllocationStorage = GetArenaAllocationStorage(Arena, RecycleStackTop))
+		if (std::byte* AllocationStorage = GetArenaAllocationStorage(Arena, RecycleStackTop))
 		{
 			const uint32_t RecycleStackNext = ReadUint32(AllocationStorage);
 			const uint32_t NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
 			const uint64_t RecycleStackNextWithState = static_cast<uint64_t>(RecycleStackNext) | (static_cast<uint64_t>(NextState) << 32);
-			if (Arena.RecycleStackTop.compare_exchange_weak(RecycleStackTopWithState, RecycleStackNextWithState))
+			if (RecycleStackTopAtomic.compare_exchange_weak(RecycleStackTopWithState, RecycleStackNextWithState))
 			{
 				Allocation.Storage = AllocationStorage;
 				Allocation.Index = RecycleStackTop;
-				return Allocation;
+				return true;
 			}
-			RecycleStackTopWithState = Arena.RecycleStackTop.load();
-			RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
+		}
+		return false;
+	}
+
+	inline bool PushRecycleStack(std::atomic<uint64_t>& RecycleStackTopAtomic, uint32_t AllocationIndex, std::byte* AllocationStorage)
+	{
+		uint64_t RecycleStackTopWithState = RecycleStackTopAtomic.load();
+		uint32_t RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
+		uint32_t NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
+		uint64_t IndexWithState = static_cast<uint64_t>(AllocationIndex) | (static_cast<uint64_t>(NextState) << 32);
+		WriteUint32(AllocationStorage, RecycleStackTop);
+		return RecycleStackTopAtomic.compare_exchange_weak(RecycleStackTopWithState, IndexWithState);
+	}
+
+	inline ArenaAllocation AllocateStorage(ArenaHeader& Arena)
+	{
+		ArenaAllocation Allocation;
+
+		if (PopRecycleStack(Arena, Arena.RecycleStack0Top, Allocation) ||
+			PopRecycleStack(Arena, Arena.RecycleStack1Top, Allocation) ||
+			PopRecycleStack(Arena, Arena.RecycleStack2Top, Allocation) ||
+			PopRecycleStack(Arena, Arena.RecycleStack3Top, Allocation))
+		{
+			return Allocation;
 		}
 
 		const uint32_t NextIndex = Arena.NextIndex.fetch_add(1);
 		ArenaLocation Location = GetArenaLocation(Arena, NextIndex);
 		const uint64_t BlockSize = GetBlockSize(Arena) + (Location.Block == 0) * GetArenaStartOffset(Arena);
-		if (Location.Block >= ArenaHeader::MaxBlocks || Location.Byte >= BlockSize)
+		if (Location.Block >= ArenaHeader::MaxBlocks)
+		{
+			MemoryError("AllocateStorage ran out of blocks");
+			return Allocation;
+		}
+		
+		if (Location.Byte >= BlockSize)
 		{
 			MemoryError("AllocateStorage couldn't get a location to allocate storage");
 			return Allocation;
@@ -338,20 +377,18 @@ namespace json2wav
 
 	inline void RecycleStorage(ArenaHeader& Arena, uint32_t Index)
 	{
-		if (std::byte* Allocation = GetArenaAllocationStorage(Arena, Index))
+		if (std::byte* AllocationStorage = GetArenaAllocationStorage(Arena, Index))
 		{
-			uint64_t RecycleStackTopWithState = InvalidUint32();
-			uint32_t RecycleStackTop = InvalidUint32();
-			uint32_t NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
-			uint64_t IndexWithState = static_cast<uint64_t>(Index) | (static_cast<uint64_t>(NextState) << 32);
-			do
+			while (true)
 			{
-				RecycleStackTopWithState = Arena.RecycleStackTop.load();
-				RecycleStackTop = static_cast<uint32_t>(RecycleStackTopWithState & 0xffffffffull);
-				NextState = static_cast<uint32_t>(RecycleStackTopWithState >> 32) + 1;
-				IndexWithState = static_cast<uint64_t>(Index) | (static_cast<uint64_t>(NextState) << 32);
-				WriteUint32(Allocation, RecycleStackTop);
-			} while (!Arena.RecycleStackTop.compare_exchange_weak(RecycleStackTopWithState, IndexWithState));
+				if (PushRecycleStack(Arena.RecycleStack0Top, Index, AllocationStorage) ||
+					PushRecycleStack(Arena.RecycleStack1Top, Index, AllocationStorage) ||
+					PushRecycleStack(Arena.RecycleStack2Top, Index, AllocationStorage) ||
+					PushRecycleStack(Arena.RecycleStack3Top, Index, AllocationStorage))
+				{
+					return;
+				}
+			}
 		}
 	}
 
