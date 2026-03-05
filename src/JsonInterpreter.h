@@ -1513,7 +1513,7 @@ namespace json2wav
 								}
 								else
 								{
-									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to current working directory?");
+									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to the current working directory?");
 								}
 
 								return; // Preset will add synths in child interpreter
@@ -2108,7 +2108,7 @@ namespace json2wav
 								}
 								else
 								{
-									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to current working directory?");
+									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to the current working directory?");
 								}
 
 								return; // Preset will add synths in child interpreter
