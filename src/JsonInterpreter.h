@@ -1501,17 +1501,21 @@ namespace json2wav
 
 							if (preset != "")
 							{
-								bool bError = true;
 								std::ifstream file(std::string("./presets/") + preset + ".json");
 								if (file)
 								{
 									JsonInterpreter presetReader(this->rthis);
 									JsonParser p;
-									bError = !p.parse(file, presetReader);
+									if (!p.parse(file, presetReader))
+									{
+										this->error("Couldn't parse preset \"" + preset + "\"");
+									}
+								}
+								else
+								{
+									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to current working directory?");
 								}
 
-								if (bError)
-									this->error("Invalid preset");
 								return; // Preset will add synths in child interpreter
 							}
 
@@ -2092,17 +2096,21 @@ namespace json2wav
 
 							if (preset != "")
 							{
-								bool bError = true;
 								std::ifstream file(std::string("./presets/") + preset + ".json");
 								if (file)
 								{
 									JsonInterpreter presetReader(this->rthis);
 									JsonParser p;
-									bError = !p.parse(file, presetReader);
+									if (!p.parse(file, presetReader))
+									{
+										this->error("Couldn't parse preset \"" + preset + "\"");
+									}
+								}
+								else
+								{
+									this->error("Couldn't read preset \"" + preset + "\". Do you need to copy/move the presets folder to current working directory?");
 								}
 
-								if (bError)
-									this->error("Invalid preset");
 								return; // Preset will add synths in child interpreter
 							}
 
