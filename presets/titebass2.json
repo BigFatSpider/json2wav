@@ -1,0 +1,64 @@
+{
+	"parts":
+	[
+		{
+			"instrument":
+			{
+				"filteredsaw":
+				{
+					"topo": "tdf2",
+					"unison": 1,
+					"freqspread": 0,
+					"phasespread": 0,
+					"panspread": 0,
+					"noiseamp": 0.0,
+					"ampattack": 0.002,
+					"ampdecay": 0.7,
+					"amprelease": 0.01,
+					"ampattlevel": 0.85,
+					"ampsuslevel": 0.8,
+					"ampattshape": "quartersin",
+					"ampdecshape": "quartersin",
+					"amprelshape": "quartersin",
+					"flampattack": 0.002,
+					"flampdecay": 0.7,
+					"flamprelease": 0.01,
+					"flampattlevel": 0.8,
+					"flampsuslevel": 0.75,
+					"flampattshape": "quartersin",
+					"flampdecshape": "quartersin",
+					"flamprelshape": "quartersin",
+					"filtattack": 0.7,
+					"filtdecay": 0.01,
+					"filtrelease": 0.05,
+					"filtattfreq": 700,
+					"filtsusfreq": 700,
+					"filtrestfreq": 1400,
+					"filtattshape": "log",
+					"filtdecshape": "log",
+					"filtrelshape": "log"
+				}
+			},
+			"volume": 0,
+			"fx":
+			[
+				{
+					"bqlopass":
+					{
+						"freq": 1400,
+						"q": 0.5
+					}
+				},
+				{
+					"bqpeak":
+					{
+						"freq": 100,
+						"q": 1.4,
+						"gain": 1.5
+					}
+				}
+			]
+		}
+	]
+}
+
