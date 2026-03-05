@@ -1,0 +1,47 @@
+{
+	"parts":
+	[
+		{
+			"instrument":
+			{
+				"filteredsaw":
+				{
+					"topo": "tdf2",
+					"unison": 17,
+					"freqspread": 5,
+					"phasespread": 1,
+					"panspread": 1,
+					"noiseamp": 0.05,
+					"ampattack": 0.002,
+					"ampdecay": 0.7,
+					"amprelease": 0.01,
+					"ampattlevel": 0.85,
+					"ampsuslevel": 0.8,
+					"ampattshape": "quartersin",
+					"ampdecshape": "quartersin",
+					"amprelshape": "quartersin",
+					"flampattack": 0.002,
+					"flampdecay": 0.7,
+					"flamprelease": 0.01,
+					"flampattlevel": 0.8,
+					"flampsuslevel": 0.75,
+					"flampattshape": "quartersin",
+					"flampdecshape": "quartersin",
+					"flamprelshape": "quartersin",
+					"filtattack": 0.7,
+					"filtdecay": 0.01,
+					"filtrelease": 0.05,
+					"filtattfreq": 2000,
+					"filtsusfreq": 2000,
+					"filtrestfreq": 10000,
+					"filtattshape": "log",
+					"filtdecshape": "log",
+					"filtrelshape": "log"
+				}
+			},
+			"fx":
+			[]
+		}
+	]
+}
+

@@ -1,0 +1,79 @@
+{
+	"parts":
+	[
+		{
+			"instrument":
+			{
+				"drumhit":
+				{
+					"freq": 197,
+					"mic_r": 0.3,
+					"hit_range_r": 0.15,
+
+					"stren2amp": 0.25,
+					"transient_time": 0.015,
+					"transient_shape": "hit2624",
+					"decay_delay": 0.005,
+					"decay_amt": 0.001,
+					"decay_time": 0.3,
+					"decay_shape": "slog",
+					"detune_delay": 0.00075,
+					"detune_amt": 0.9,
+					"detune_time": 0.7,
+					"detune_shape": "log",
+					"filt0freq": 8000.0,
+					"filt0res": 0.5,
+					"filt1freq": 2500.0,
+					"filt1res": 0.5,
+					"filt2freq": 800.0,
+					"filt2res": 0.7,
+					"filt3freq": 0.0,
+					"filt3res": 0.7,
+					"env0att": 0.00175,
+					"env0dec": 0.035,
+					"env0rel": 0.035,
+					"env0attlev": 48.0,
+					"env0suslev": 36.0,
+					"env0attshape": "s",
+					"env0decshape": "linear",
+					"env0relshape": "linear",
+					"env1att": 0.0875,
+					"env1dec": 0.025,
+					"env1rel": 0.025,
+					"env1attlev": 34.0,
+					"env1suslev": 28.0,
+					"env1attshape": "s",
+					"env1decshape": "linear",
+					"env1relshape": "linear",
+					"env2att": 0.0375,
+					"env2dec": 0.0375,
+					"env2rel": 0.04875,
+					"env2attlev": 12.0,
+					"env2suslev": 9.0,
+					"env2attshape": "s",
+					"env2decshape": "linear",
+					"env2relshape": "linear",
+					"env3att": 0.01,
+					"env3dec": 0.3,
+					"env3rel": 0.05,
+					"env3attlev": 0.0,
+					"env3suslev": 3.0,
+					"env3attshape": "s",
+					"env3decshape": "linear",
+					"env3relshape": "linear",
+					"filt0del": 0.0,
+					"filt1del": 0.0,
+					"filt2del": 0.0,
+					"filt3del": 0.002,
+
+					"modecay": "halfup100"
+
+				}
+			},
+			"volume": 0,
+			"fx":
+			[]
+		}
+	]
+}
+

@@ -1,0 +1,47 @@
+{
+	"parts":
+	[
+		{
+			"instrument":
+			{
+				"noisehit":
+				{
+					"topo": "tdf2",
+					"unison": 1,
+					"freqspread": 5,
+					"phasespread": 1,
+					"panspread": 1,
+					"noiseamp": 1.0,
+					"ampattack": 0.002,
+					"ampdecay": 1.0,
+					"amprelease": 0.1,
+					"ampattlevel": 0.85,
+					"ampsuslevel": 0.3,
+					"ampattshape": "hit2624",
+					"ampdecshape": "quartersin",
+					"amprelshape": "quartersin",
+					"flampattack": 0.002,
+					"flampdecay": 0.7,
+					"flamprelease": 0.01,
+					"flampattlevel": 0.8,
+					"flampsuslevel": 0.75,
+					"flampattshape": "hit2624",
+					"flampdecshape": "quartersin",
+					"flamprelshape": "quartersin",
+					"filtattack": 1.0,
+					"filtdecay": 0.01,
+					"filtrelease": 0.05,
+					"filtattfreq": 2000,
+					"filtsusfreq": 2000,
+					"filtrestfreq": 10000,
+					"filtattshape": "log",
+					"filtdecshape": "log",
+					"filtrelshape": "log"
+				}
+			},
+			"fx":
+			[]
+		}
+	]
+}
+
