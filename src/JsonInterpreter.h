@@ -34,12 +34,21 @@
 
 namespace json2wav
 {
-	template<typename HitSynthType> struct HitSynthModeName
-	{ static constexpr const char* const name = "Parts::Part::Instrument::HitSynth"; };
-	template<> struct HitSynthModeName<DrumHitSynth>
-	{ static constexpr const char* const name = "Parts::Part::Instrument::DrumHit"; };
-	template<> struct HitSynthModeName<AdditiveHitSynth>
-	{ static constexpr const char* const name = "Parts::Part::Instrument::AdditiveHit"; };
+	template<typename HitSynthType>
+	struct HitSynthModeName
+	{
+		static constexpr const char* const name = "Parts::Part::Instrument::HitSynth";
+	};
+	template<>
+	struct HitSynthModeName<DrumHitSynth>
+	{
+		static constexpr const char* const name = "Parts::Part::Instrument::DrumHit";
+	};
+	template<>
+	struct HitSynthModeName<AdditiveHitSynth>
+	{
+		static constexpr const char* const name = "Parts::Part::Instrument::AdditiveHit";
+	};
 
 	template<Filter::ETopo eTopo, typename... ParamTypes>
 	inline SharedPtr<AudioJoin<>> CreateBesselLPPtr(ControlSet& ctrls, const uint_fast8_t order, ParamTypes&&... params)
@@ -72,18 +81,33 @@ namespace json2wav
 			Vector<SharedPtr<AudioJoin<>>>& effects)
 		{
 			if (!effect)
+			{
 				return;
+			}
 
-			SharedPtr<AudioJoin<>> back((effects.empty()) ? output : effects.back());
+			const SharedPtr<AudioJoin<>>& back(effects.empty() ? output : effects.back());
+			if (!back)
+			{
+				return;
+			}
+
 			Vector<SharedPtr<IAudioObject>> inputs;
 			inputs.reserve(back->GetInputs().size());
-			for (auto input : back->GetInputs())
-				if (SharedPtr<IAudioObject> obj = Utility::Lock(input))
-					inputs.emplace_back(std::move(obj));
+			for (const auto& input : back->GetInputs())
+			{
+				if (SharedPtr<IAudioObject> audioObject = Utility::Lock(input))
+				{
+					inputs.emplace_back(std::move(audioObject));
+				}
+			}
 			back->ClearInputs();
+
 			back->AddInput(effect);
-			for (auto input : inputs)
-				effect->AddInput(input);
+			for (SharedPtr<IAudioObject>& input : inputs)
+			{
+				effect->AddInput(std::move(input));
+			}
+
 			effects.emplace_back(std::move(effect));
 		}
 
@@ -112,22 +136,34 @@ namespace json2wav
 						for (size_t i = 0; i < rthis.audioObjects.size(); ++i)
 						{
 							if (rthis.drums[i])
+							{
 								rthis.drums[i]->AddEvent(sampleNum, eventParams...);
+							}
 							else if (rthis.hits[i])
+							{
 								rthis.hits[i]->AddEvent(sampleNum, eventParams...);
+							}
 							else if (rthis.synths[i])
+							{
 								json2wav::AddEvent(rthis.synths[i], sampleNum, 1.0f, eventParams...);
+							}
 						}
 					}
 
 					float GetRelease() const
 					{
 						if (rthis.synthPointer)
+						{
 							return rthis.synthPointer->GetRelease();
+						}
 						if (rthis.drumPointer)
+						{
 							return rthis.drumPointer->GetRelease();
+						}
 						if (rthis.hitPointer)
+						{
 							return rthis.hitPointer->GetRelease();
+						}
 						return 0.0f;
 					}
 
@@ -135,15 +171,17 @@ namespace json2wav
 					SynthWrapper& rthis;
 				};
 
-				SynthWrapper() : idx(0), methods(*this)
+				SynthWrapper() : index(0), methods(*this)
 				{
 				}
-				template<typename T> SynthWrapper(SharedPtr<T> ptr)
+
+				template<typename T>
+				SynthWrapper(SharedPtr<T> ptr)
 					: audioObjectPointer(ptr),
-					synthPointer(Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr)),
-					drumPointer(Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr)),
+					synthPointer(Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(std::move(ptr), nullptr)),
+					drumPointer(Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(std::move(ptr), nullptr)),
 					hitPointer(Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr)),
-					idx(0),
+					index(0),
 					methods(*this)
 				{
 					audioObjects.push_back(audioObjectPointer);
@@ -155,17 +193,17 @@ namespace json2wav
 				template<typename T>
 				SynthWrapper& operator=(SharedPtr<T> ptr)
 				{
-					if (idx >= audioObjects.size())
+					if (index >= audioObjects.size())
 					{
-						idx = audioObjects.size();
+						index = audioObjects.size();
 						push_back(std::move(ptr));
 						return *this;
 					}
 
-					audioObjects[idx] = ptr;
-					synths[idx] = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
-					drums[idx] = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
-					hits[idx] = Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
+					audioObjects[index] = ptr;
+					synths[index] = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(std::move(ptr), nullptr);
+					drums[index] = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(std::move(ptr), nullptr);
+					hits[index] = Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
 					UpdatePtrs();
 					return *this;
 				}
@@ -174,8 +212,8 @@ namespace json2wav
 				void push_back(SharedPtr<T> ptr)
 				{
 					audioObjectPointer = ptr;
-					synthPointer = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
-					drumPointer = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
+					synthPointer = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(std::move(ptr), nullptr);
+					drumPointer = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(std::move(ptr), nullptr);
 					hitPointer = Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
 
 					audioObjects.push_back(audioObjectPointer);
@@ -228,82 +266,82 @@ namespace json2wav
 				class Iterator
 				{
 				public:
-					Iterator(SynthWrapper& rwrapperInit) : pwrapper(&rwrapperInit), idx(0) {}
-					Iterator(const Iterator& other) : pwrapper(other.pwrapper), idx(other.idx) {}
+					Iterator(SynthWrapper& wrapperInit) : wrapper(&wrapperInit), index(0) {}
+					Iterator(const Iterator& other) : wrapper(other.wrapper), index(other.index) {}
 					Iterator& operator=(const Iterator& other)
 					{
-						pwrapper = other.pwrapper;
-						idx = other.idx;
+						wrapper = other.wrapper;
+						index = other.index;
 						return *this;
 					}
-					Iterator& operator=(const size_t idxAssign)
+					Iterator& operator=(const size_t indexAssign)
 					{
-						idx = idxAssign;
+						index = indexAssign;
 						return *this;
 					}
 
 					SynthWrapper& operator*()
 					{
-						pwrapper->idx = idx;
-						pwrapper->UpdatePtrs();
-						return *pwrapper;
+						wrapper->index = index;
+						wrapper->UpdatePtrs();
+						return *wrapper;
 					}
 					SynthWrapper* operator->()
 					{
-						pwrapper->idx = idx;
-						pwrapper->UpdatePtrs();
-						return pwrapper;
+						wrapper->index = index;
+						wrapper->UpdatePtrs();
+						return wrapper;
 					}
 
 					Iterator& operator++()
 					{
-						++idx;
+						++index;
 						return *this;
 					}
 					Iterator operator++(int)
 					{
 						Iterator it(*this);
-						++idx;
+						++index;
 						return it;
 					}
 
 					Iterator& operator--()
 					{
-						--idx;
+						--index;
 						return *this;
 					}
 					Iterator operator--(int)
 					{
 						Iterator it(*this);
-						--idx;
+						--index;
 						return it;
 					}
 
-					Iterator& operator+=(const size_t idxadd)
+					Iterator& operator+=(const size_t indexAdd)
 					{
-						idx += idxadd;
+						index += indexAdd;
 						return *this;
 					}
 
-					Iterator& operator-=(const size_t idxsub)
+					Iterator& operator-=(const size_t indexSub)
 					{
-						idx -= idxsub;
+						index -= indexSub;
 						return *this;
 					}
 
 					friend inline size_t operator+(const Iterator& lhs, const Iterator& rhs)
 					{
-						return lhs.idx + rhs.idx;
+						return lhs.index + rhs.index;
 					}
 
 					friend inline size_t operator-(const Iterator& lhs, const Iterator& rhs)
 					{
-						return lhs.idx - rhs.idx;
+						return lhs.index - rhs.index;
 					}
 
 					friend inline bool operator==(const Iterator& lhs, const Iterator& rhs)
 					{
-						return lhs.pwrapper == rhs.pwrapper && lhs.idx == rhs.idx;
+						return lhs.wrapper == rhs.wrapper && lhs.index == rhs.index;
 					}
 					friend inline bool operator!=(const Iterator lhs, const Iterator& rhs)
 					{
@@ -311,8 +349,8 @@ namespace json2wav
 					}
 
 				private:
-					SynthWrapper* pwrapper;
-					size_t idx;
+					SynthWrapper* wrapper;
+					size_t index;
 				};
 
 				Iterator begin()
@@ -330,10 +368,10 @@ namespace json2wav
 			private:
 				void UpdatePtrs()
 				{
-					audioObjectPointer = audioObjects[idx];
-					synthPointer = synths[idx];
-					drumPointer = drums[idx];
-					hitPointer = hits[idx];
+					audioObjectPointer = audioObjects[index];
+					synthPointer = synths[index];
+					drumPointer = drums[index];
+					hitPointer = hits[index];
 				}
 
 			private:
@@ -346,7 +384,7 @@ namespace json2wav
 				Vector<SharedPtr<CompositeSynth>> synths;
 				Vector<SharedPtr<DrumHitSynth>> drums;
 				Vector<SharedPtr<AdditiveHitSynth>> hits;
-				size_t idx;
+				size_t index;
 
 				Methods methods;
 			};
@@ -360,7 +398,17 @@ namespace json2wav
 				float dur;
 			};
 
-			PartData() : volume(0.0), edoinv(0.0), dur(0.0f), bIsRhythm(false), bNoteAmpsDB(false), numDuplications(0), transpose(1.0) {}
+			PartData()
+				: volume(0.0),
+				edoinv(0.0),
+				dur(0.0f),
+				bIsRhythm(false),
+				bNoteAmpsDB(false),
+				numDuplications(0),
+				transpose(1.0)
+			{
+			}
+
 			Vector<SharedPtr<Fader<>>> outputFaders;
 			Vector<SharedPtr<BusData>> outputs;
 			SharedPtr<BasicMult<>> outputMult;
@@ -386,15 +434,21 @@ namespace json2wav
 
 			BusData() : volume(MakeShared<Fader<>>()) {}
 
-			void AddInput(SharedPtr<IAudioObject> obj)
+			void AddInput(SharedPtr<IAudioObject> audioObject)
 			{
-				if (!obj)
+				if (!audioObject)
+				{
 					return;
+				}
 
 				if (effects.empty())
-					volume->AddInput(obj);
+				{
+					volume->AddInput(std::move(audioObject));
+				}
 				else
-					effects.back()->AddInput(obj);
+				{
+					effects.back()->AddInput(std::move(audioObject));
+				}
 			}
 
 			void AddEffect(SharedPtr<AudioJoin<>> effect)
@@ -405,7 +459,9 @@ namespace json2wav
 			void AddBus(SharedPtr<BusData> bus)
 			{
 				if (!bus)
+				{
 					return;
+				}
 
 				AddInput(bus->volume);
 				busses.emplace_back(std::move(bus));
