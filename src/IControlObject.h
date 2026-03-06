@@ -143,12 +143,6 @@ namespace json2wav
 			return ptr;
 		}
 
-	private:
-		template<typename T, typename U>
-		friend class ControlObject;
-
-		friend class ControlSet;
-
 		class ControlObjectBase
 		{
 			template<typename T, typename U>
@@ -254,6 +248,7 @@ namespace json2wav
 			std::map<size_t, Vector<SharedPtr<IEvent>>> events;
 		};
 
+	private:
 		SharedPtr<ControlObjectBase> ctrl;
 	};
 
