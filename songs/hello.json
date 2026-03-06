@@ -1,0 +1,49 @@
+{
+    "meta": {
+        "name": "hello",
+        "tempo": 480,
+        "key": 60.15625
+    },
+    "mixer": {
+        "volume": 0,
+        "fx": [],
+        "busses": [
+            {
+                "volume": 0,
+                "fx": [],
+                "busses": []
+            }
+        ]
+    },
+    "parts": [
+        {
+            "instrument": {
+                "filteredsaw": {
+                    "preset": "titechords2_17vox"
+                }
+            },
+            "volume": -15,
+            "fx": [],
+            "outputs": [
+                {
+                    "path": [
+                        "mixer", 0
+                    ],
+                    "volume": 0
+                }
+            ],
+            "notes": {
+                "tuning": "freq",
+                "timing": "relative",
+                "db": true,
+                "values": [
+					[
+                        180.46875,
+                        6.666666666666667,
+                        0.04
+                    ]
+				]
+            }
+        }
+    ]
+}
