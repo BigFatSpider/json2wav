@@ -5,7 +5,6 @@
 #include "MemoryCommon.h"
 #include "Macros.h"
 #include <mutex>
-#include <bit>
 #include <cstdint>
 #include <cstddef>
 #include <cstdlib>
@@ -13,32 +12,15 @@
 
 namespace json2wav
 {
-	template<std::endian Endian>
-	inline uint32_t ReadUint32Endianed(std::byte* Memory);
-
-	template<>
-	inline uint32_t ReadUint32Endianed<std::endian::little>(std::byte* Memory)
+	inline uint32_t ReadUint32(const std::byte* Memory)
 	{
-		const uint32_t Byte0 = std::to_integer<uint32_t>(Memory[0]);
-		const uint32_t Byte1 = std::to_integer<uint32_t>(Memory[1]);
-		const uint32_t Byte2 = std::to_integer<uint32_t>(Memory[2]);
-		const uint32_t Byte3 = std::to_integer<uint32_t>(Memory[3]);
-		return Byte0 | (Byte1 << 8) | (Byte2 << 16) | (Byte3 << 24);
-	}
-
-	template<>
-	inline uint32_t ReadUint32Endianed<std::endian::big>(std::byte* Memory)
-	{
-		const uint32_t Byte0 = std::to_integer<uint32_t>(Memory[0]);
-		const uint32_t Byte1 = std::to_integer<uint32_t>(Memory[1]);
-		const uint32_t Byte2 = std::to_integer<uint32_t>(Memory[2]);
-		const uint32_t Byte3 = std::to_integer<uint32_t>(Memory[3]);
-		return (Byte0 << 24) | (Byte1 << 16) | (Byte2 << 8) | Byte3;
-	}
-
-	inline uint32_t ReadUint32(std::byte* Memory)
-	{
-		return ReadUint32Endianed<std::endian::native>(Memory);
+		uint32_t Value;
+		std::byte* ValueMemory = reinterpret_cast<std::byte*>(&Value);
+		ValueMemory[0] = Memory[0];
+		ValueMemory[1] = Memory[1];
+		ValueMemory[2] = Memory[2];
+		ValueMemory[3] = Memory[3];
+		return Value;
 	}
 
 	inline void WriteUint32(std::byte* Memory, uint32_t Value)
