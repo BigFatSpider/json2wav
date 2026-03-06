@@ -34,7 +34,7 @@
 
 namespace json2wav
 {
-	template<typename HitSynth_t> struct HitSynthModeName
+	template<typename HitSynthType> struct HitSynthModeName
 	{ static constexpr const char* const name = "Parts::Part::Instrument::HitSynth"; };
 	template<> struct HitSynthModeName<DrumHitSynth>
 	{ static constexpr const char* const name = "Parts::Part::Instrument::DrumHit"; };
@@ -63,18 +63,18 @@ namespace json2wav
 	}
 
 	template<bool bLog>
-	class JsonInterpreter_t : public Utility::TypeIf_t<bLog, IJsonLogger, IJsonWalker>
+	class JsonInterpreterType : public Utility::ConditionalType<bLog, IJsonLogger, IJsonWalker>
 	{
 	public:
 		static void AddEffect(
 			SharedPtr<AudioJoin<>> effect,
 			SharedPtr<AudioJoin<>> output,
-			Vector<SharedPtr<AudioJoin<>>>& fx)
+			Vector<SharedPtr<AudioJoin<>>>& effects)
 		{
 			if (!effect)
 				return;
 
-			SharedPtr<AudioJoin<>> back((fx.empty()) ? output : fx.back());
+			SharedPtr<AudioJoin<>> back((effects.empty()) ? output : effects.back());
 			Vector<SharedPtr<IAudioObject>> inputs;
 			inputs.reserve(back->GetInputs().size());
 			for (auto input : back->GetInputs())
@@ -84,11 +84,11 @@ namespace json2wav
 			back->AddInput(effect);
 			for (auto input : inputs)
 				effect->AddInput(input);
-			fx.emplace_back(std::move(effect));
+			effects.emplace_back(std::move(effect));
 		}
 
 	private:
-		using JsonInterpreter = JsonInterpreter_t<bLog>;
+		using JsonInterpreter = JsonInterpreterType<bLog>;
 
 		struct BusData;
 
@@ -107,27 +107,27 @@ namespace json2wav
 				public:
 					// Parameter pack by value
 					template<typename... EventParamTypes>
-					void AddEvent(const size_t samplenum, EventParamTypes... eventParams)
+					void AddEvent(const size_t sampleNum, EventParamTypes... eventParams)
 					{
-						for (size_t i = 0; i < rthis.vaudio.size(); ++i)
+						for (size_t i = 0; i < rthis.audioObjects.size(); ++i)
 						{
-							if (rthis.vdrum[i])
-								rthis.vdrum[i]->AddEvent(samplenum, eventParams...);
-							else if (rthis.vhit[i])
-								rthis.vhit[i]->AddEvent(samplenum, eventParams...);
-							else if (rthis.vcomp[i])
-								json2wav::AddEvent(rthis.vcomp[i], samplenum, 1.0f, eventParams...);
+							if (rthis.drums[i])
+								rthis.drums[i]->AddEvent(sampleNum, eventParams...);
+							else if (rthis.hits[i])
+								rthis.hits[i]->AddEvent(sampleNum, eventParams...);
+							else if (rthis.synths[i])
+								json2wav::AddEvent(rthis.synths[i], sampleNum, 1.0f, eventParams...);
 						}
 					}
 
 					float GetRelease() const
 					{
-						if (rthis.pcomp)
-							return rthis.pcomp->GetRelease();
-						if (rthis.pdrum)
-							return rthis.pdrum->GetRelease();
-						if (rthis.phit)
-							return rthis.phit->GetRelease();
+						if (rthis.synthPointer)
+							return rthis.synthPointer->GetRelease();
+						if (rthis.drumPointer)
+							return rthis.drumPointer->GetRelease();
+						if (rthis.hitPointer)
+							return rthis.hitPointer->GetRelease();
 						return 0.0f;
 					}
 
@@ -139,33 +139,33 @@ namespace json2wav
 				{
 				}
 				template<typename T> SynthWrapper(SharedPtr<T> ptr)
-					: paudio(ptr),
-					pcomp(Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr)),
-					pdrum(Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr)),
-					phit(Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr)),
+					: audioObjectPointer(ptr),
+					synthPointer(Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr)),
+					drumPointer(Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr)),
+					hitPointer(Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr)),
 					idx(0),
 					methods(*this)
 				{
-					vaudio.push_back(paudio);
-					vcomp.push_back(pcomp);
-					vdrum.push_back(pdrum);
-					vhit.push_back(phit);
+					audioObjects.push_back(audioObjectPointer);
+					synths.push_back(synthPointer);
+					drums.push_back(drumPointer);
+					hits.push_back(hitPointer);
 				}
 
 				template<typename T>
 				SynthWrapper& operator=(SharedPtr<T> ptr)
 				{
-					if (idx >= vaudio.size())
+					if (idx >= audioObjects.size())
 					{
-						idx = vaudio.size();
+						idx = audioObjects.size();
 						push_back(std::move(ptr));
 						return *this;
 					}
 
-					vaudio[idx] = ptr;
-					vcomp[idx] = Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
-					vdrum[idx] = Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
-					vhit[idx] = Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
+					audioObjects[idx] = ptr;
+					synths[idx] = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
+					drums[idx] = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
+					hits[idx] = Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
 					UpdatePtrs();
 					return *this;
 				}
@@ -173,15 +173,15 @@ namespace json2wav
 				template<typename T>
 				void push_back(SharedPtr<T> ptr)
 				{
-					paudio = ptr;
-					pcomp = Utility::TypeIf_v<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
-					pdrum = Utility::TypeIf_v<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
-					phit = Utility::TypeIf_v<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
+					audioObjectPointer = ptr;
+					synthPointer = Utility::ConditionalValue<std::is_base_of_v<CompositeSynth, T>, SharedPtr<CompositeSynth>>(ptr, nullptr);
+					drumPointer = Utility::ConditionalValue<std::is_base_of_v<DrumHitSynth, T>, SharedPtr<DrumHitSynth>>(ptr, nullptr);
+					hitPointer = Utility::ConditionalValue<std::is_base_of_v<AdditiveHitSynth, T>, SharedPtr<AdditiveHitSynth>>(std::move(ptr), nullptr);
 
-					vaudio.push_back(paudio);
-					vcomp.push_back(pcomp);
-					vdrum.push_back(pdrum);
-					vhit.push_back(phit);
+					audioObjects.push_back(audioObjectPointer);
+					synths.push_back(synthPointer);
+					drums.push_back(drumPointer);
+					hits.push_back(hitPointer);
 					UpdatePtrs();
 				}
 
@@ -197,32 +197,32 @@ namespace json2wav
 
 				operator SharedPtr<IAudioObject>()
 				{
-					return paudio;
+					return audioObjectPointer;
 				}
 
 				operator SharedPtr<CompositeSynth>()
 				{
-					return pcomp;
+					return synthPointer;
 				}
 
 				operator SharedPtr<DrumHitSynth>()
 				{
-					return pdrum;
+					return drumPointer;
 				}
 
 				operator SharedPtr<AdditiveHitSynth>()
 				{
-					return phit;
+					return hitPointer;
 				}
 
 				explicit operator bool() const
 				{
-					return !!paudio;
+					return !!audioObjectPointer;
 				}
 
 				SharedPtr<CompositeSynth>& GetComp()
 				{
-					return pcomp;
+					return synthPointer;
 				}
 
 				class Iterator
@@ -323,29 +323,29 @@ namespace json2wav
 				Iterator end()
 				{
 					Iterator it(*this);
-					it = vaudio.size();
+					it = audioObjects.size();
 					return it;
 				}
 
 			private:
 				void UpdatePtrs()
 				{
-					paudio = vaudio[idx];
-					pcomp = vcomp[idx];
-					pdrum = vdrum[idx];
-					phit = vhit[idx];
+					audioObjectPointer = audioObjects[idx];
+					synthPointer = synths[idx];
+					drumPointer = drums[idx];
+					hitPointer = hits[idx];
 				}
 
 			private:
-				SharedPtr<IAudioObject> paudio;
-				SharedPtr<CompositeSynth> pcomp;
-				SharedPtr<DrumHitSynth> pdrum;
-				SharedPtr<AdditiveHitSynth> phit;
+				SharedPtr<IAudioObject> audioObjectPointer;
+				SharedPtr<CompositeSynth> synthPointer;
+				SharedPtr<DrumHitSynth> drumPointer;
+				SharedPtr<AdditiveHitSynth> hitPointer;
 
-				Vector<SharedPtr<IAudioObject>> vaudio;
-				Vector<SharedPtr<CompositeSynth>> vcomp;
-				Vector<SharedPtr<DrumHitSynth>> vdrum;
-				Vector<SharedPtr<AdditiveHitSynth>> vhit;
+				Vector<SharedPtr<IAudioObject>> audioObjects;
+				Vector<SharedPtr<CompositeSynth>> synths;
+				Vector<SharedPtr<DrumHitSynth>> drums;
+				Vector<SharedPtr<AdditiveHitSynth>> hits;
 				size_t idx;
 
 				Methods methods;
@@ -360,28 +360,28 @@ namespace json2wav
 				float dur;
 			};
 
-			PartData() : volume(0.0), edoinv(0.0), dur(0.0f), isrhythm(false), noteampsdb(false), ndups(0), transpose(1.0) {}
-			Vector<SharedPtr<Fader<>>> outfaders;
+			PartData() : volume(0.0), edoinv(0.0), dur(0.0f), bIsRhythm(false), bNoteAmpsDB(false), numDuplications(0), transpose(1.0) {}
+			Vector<SharedPtr<Fader<>>> outputFaders;
 			Vector<SharedPtr<BusData>> outputs;
-			SharedPtr<BasicMult<>> outmult;
+			SharedPtr<BasicMult<>> outputMult;
 			//SharedPtr<CompositeSynth> instrument; // TODO: Make a wrapper type to deal with non-composite synths
 			SynthWrapper instrument;
 			double volume;
-			Vector<SharedPtr<AudioJoin<>>> fx;
-			Vector<SharedPtr<AudioJoin<>>> fx2add;
+			Vector<SharedPtr<AudioJoin<>>> effects;
+			Vector<SharedPtr<AudioJoin<>>> effectsToAdd;
 			Vector<NoteEventData> notes;
 			double edoinv;
 			float dur;
-			bool isrhythm;
-			bool noteampsdb;
-			size_t ndups;
+			bool bIsRhythm;
+			bool bNoteAmpsDB;
+			size_t numDuplications;
 			double transpose;
 		};
 
 		struct BusData
 		{
 			SharedPtr<Fader<>> volume;
-			Vector<SharedPtr<AudioJoin<>>> fx;
+			Vector<SharedPtr<AudioJoin<>>> effects;
 			Vector<SharedPtr<BusData>> busses;
 
 			BusData() : volume(MakeShared<Fader<>>()) {}
@@ -391,15 +391,15 @@ namespace json2wav
 				if (!obj)
 					return;
 
-				if (fx.empty())
+				if (effects.empty())
 					volume->AddInput(obj);
 				else
-					fx.back()->AddInput(obj);
+					effects.back()->AddInput(obj);
 			}
 
 			void AddEffect(SharedPtr<AudioJoin<>> effect)
 			{
-				JsonInterpreter::AddEffect(std::move(effect), volume, fx);
+				JsonInterpreter::AddEffect(std::move(effect), volume, effects);
 			}
 
 			void AddBus(SharedPtr<BusData> bus)
@@ -418,11 +418,11 @@ namespace json2wav
 		};
 
 	public:
-		JsonInterpreter_t(const std::string& nameInit = "music")
+		JsonInterpreterType(const std::string& nameInit = "music")
 			: mode(nullptr),
 			error(*this), done(*this, &error), top(*this, &done),
 			meta(*this, &top), mixer(*this, &top), parts(*this, &top),
-			volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
+			volume(*this), effects(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
 			name(nameInit), beatlen(0.0), key(0.0), samplerate(44100), timelen(0.0f),
 			pctrls(MakeShared<ControlSet>()), ctrls(*pctrls),
 			partdatas(vpartdatas),
@@ -435,11 +435,11 @@ namespace json2wav
 		}
 
 	private:
-		JsonInterpreter_t(JsonInterpreter_t& parent)
+		JsonInterpreterType(JsonInterpreterType& parent)
 			: mode(nullptr),
 			error(*this), done(*this, &error), top(*this, &done),
 			meta(*this, &top), mixer(*this, &top), parts(*this, &top),
-			volume(*this), fx(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
+			volume(*this), effects(*this), paramNum(*this), paramStr(*this), paramBool(*this), paRamp(*this),
 			name(parent.name), beatlen(parent.beatlen), key(parent.key),
 			samplerate(parent.samplerate), timelen(parent.timelen),
 			ctrls(parent.ctrls),
@@ -821,7 +821,7 @@ namespace json2wav
 							{ this->rthis.currentbus->volume->SetGainDB(static_cast<float>(*static_cast<double*>(pvalue))); });
 					else if (nodekey == "fx")
 					{
-						this->rthis.PushMode(&this->rthis.fx, [](void*) {});
+						this->rthis.PushMode(&this->rthis.effects, [](void*) {});
 						this->rthis.addEffect = [this](SharedPtr<AudioJoin<>> effect)
 							{ this->rthis.currentbus->AddEffect(std::move(effect)); };
 					}
@@ -997,7 +997,7 @@ namespace json2wav
 				{
 					if (nodekey == "duplication" || nodekey == "dup")
 						this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
-							{ this->rthis.partdatas.back().ndups = static_cast<size_t>(*static_cast<double*>(pvalue)); });
+							{ this->rthis.partdatas.back().numDuplications = static_cast<size_t>(*static_cast<double*>(pvalue)); });
 					else if (nodekey == "instrument")
 						this->rthis.mode = &instrument;
 					else if (nodekey == "volume")
@@ -1007,10 +1007,10 @@ namespace json2wav
 						this->rthis.mode = &outputs;
 					else if (nodekey == "fx")
 					{
-						this->rthis.PushMode(&this->rthis.fx, [](void*) {});
+						this->rthis.PushMode(&this->rthis.effects, [](void*) {});
 						this->rthis.addEffect = [this](SharedPtr<AudioJoin<>> effect)
 						{
-							this->rthis.partdatas.back().fx2add.emplace_back(std::move(effect));
+							this->rthis.partdatas.back().effectsToAdd.emplace_back(std::move(effect));
 						};
 					}
 					else if (nodekey == "notes")
@@ -1034,7 +1034,7 @@ namespace json2wav
 					static const double DB_TO_EXP = std::log10(2.0) / 6.0;
 					const float partamp = static_cast<float>(std::pow(10.0, DB_TO_EXP * partdata.volume));
 					typedef float (*famp_t)(const float);
-					famp_t famp = (partdata.noteampsdb)
+					famp_t famp = (partdata.bNoteAmpsDB)
 						? static_cast<famp_t>([](const float db)
 							{
 								static const float DB_TO_EXPF = std::log10f(2.0f) / 6.0f;
@@ -1042,7 +1042,7 @@ namespace json2wav
 							})
 						: static_cast<famp_t>([](const float amp) { return amp; });
 
-					if (partdata.outputs.size() != partdata.outfaders.size())
+					if (partdata.outputs.size() != partdata.outputFaders.size())
 					{
 						this->error(std::string("Numbers of faders and outputs do not match for part ")
 							+ std::to_string(this->rthis.partdatas.size() - 1));
@@ -1056,12 +1056,12 @@ namespace json2wav
 						return;
 					}
 
-					SharedPtr<AudioJoin<>> outnode = partdata.outfaders[0];
+					SharedPtr<AudioJoin<>> outnode = partdata.outputFaders[0];
 					if (partdata.outputs.size() > 1)
 					{
-						partdata.outmult = MakeShared<BasicMult<>>();
-						outnode = partdata.outmult;
-						for (SharedPtr<Fader<>> pfader : partdata.outfaders)
+						partdata.outputMult = MakeShared<BasicMult<>>();
+						outnode = partdata.outputMult;
+						for (SharedPtr<Fader<>> pfader : partdata.outputFaders)
 						{
 							if (!pfader)
 							{
@@ -1073,14 +1073,14 @@ namespace json2wav
 						}
 					}
 
-					for (SharedPtr<AudioJoin<>>& effect : partdata.fx2add)
-						JsonInterpreter::AddEffect(std::move(effect), outnode, partdata.fx);
-					partdata.fx2add.clear();
+					for (SharedPtr<AudioJoin<>>& effect : partdata.effectsToAdd)
+						JsonInterpreter::AddEffect(std::move(effect), outnode, partdata.effects);
+					partdata.effectsToAdd.clear();
 
 					for (size_t outidx = 0, numouts = partdata.outputs.size(); outidx < numouts; ++outidx)
 					{
 						auto poutput = partdata.outputs[outidx];
-						auto pfader = partdata.outfaders[outidx];
+						auto pfader = partdata.outputFaders[outidx];
 						if (!poutput)
 						{
 							this->error(std::string("Null output pointer for part ")
@@ -1100,14 +1100,14 @@ namespace json2wav
 
 					for (auto& synth : partdata.instrument)
 					{
-						if (partdata.fx.size() > 0)
-							partdata.fx.back()->AddInput(synth);
+						if (partdata.effects.size() > 0)
+							partdata.effects.back()->AddInput(synth);
 						else
 							outnode->AddInput(synth);
 
 						static const float ampthresh = 0.0001f; // -80 dB
 						float endtime(0.0f);
-						if (partdata.isrhythm)
+						if (partdata.bIsRhythm)
 						{
 							for (const typename PartData::NoteEventData& note : partdata.notes)
 							{
@@ -1241,12 +1241,12 @@ namespace json2wav
 						else if (nodekey == drumhit.ModeKey())
 						{
 							this->rthis.mode = &drumhit;
-							this->rthis.partdatas.back().isrhythm = true;
+							this->rthis.partdatas.back().bIsRhythm = true;
 						}
 						else if (nodekey == additivehit.ModeKey())
 						{
 							this->rthis.mode = &additivehit;
-							this->rthis.partdatas.back().isrhythm = true;
+							this->rthis.partdatas.back().bIsRhythm = true;
 						}
 						else
 							this->InvalidKeyError(std::move(nodekey));
@@ -1261,16 +1261,16 @@ namespace json2wav
 						if (this->rthis.partdatas.back().instrument)
 							this->error("Multiple instruments specified in part");
 						else if (value == "fatsaw0")
-							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas.back().numDuplications + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateFatSaw0(this->rthis.ctrls));
 						else if (value == "fatsaw1")
-							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas.back().numDuplications + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateFatSaw1(this->rthis.ctrls));
 						else if (value == "solidsaw0")
-							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas.back().numDuplications + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateSolidSaw0(this->rthis.ctrls));
 						else if (value == "solidsaw1")
-							for (size_t i = 0, n = this->rthis.partdatas.back().ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas.back().numDuplications + 1; i < n; ++i)
 								this->rthis.partdatas.back().instrument.push_back(CreateSolidSaw1(this->rthis.ctrls));
 						else
 							this->InvalidStringError(std::move(value));
@@ -1544,7 +1544,7 @@ namespace json2wav
 							}
 							
 							const size_t pdidx(this->rthis.partdatas.size() - 1);
-							for (size_t i = 0, n = this->rthis.partdatas[pdidx].ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas[pdidx].numDuplications + 1; i < n; ++i)
 							{
 								switch (uSawType)
 								{
@@ -2115,7 +2115,7 @@ namespace json2wav
 							}
 
 							const size_t pdidx(this->rthis.partdatas.size() - 1);
-							for (size_t i = 0, n = this->rthis.partdatas[pdidx].ndups + 1; i < n; ++i)
+							for (size_t i = 0, n = this->rthis.partdatas[pdidx].numDuplications + 1; i < n; ++i)
 							{
 								SharedPtr<HitSynth_t> psynth = CreateSynth();
 								this->rthis.partdatas[pdidx].instrument.push_back(psynth);
@@ -2396,7 +2396,7 @@ namespace json2wav
 				private:
 					void OnNode()
 					{
-						this->rthis.partdatas.back().outfaders.push_back(MakeShared<Fader<>>());
+						this->rthis.partdatas.back().outputFaders.push_back(MakeShared<Fader<>>());
 						this->rthis.partdatas.back().outputs.push_back(nullptr);
 						this->rthis.mode = &output;
 					}
@@ -2430,7 +2430,7 @@ namespace json2wav
 								this->rthis.PushMode(&this->rthis.volume,
 									[this](void* pvalue)
 									{
-										this->rthis.partdatas.back().outfaders.back()->SetGainDB(
+										this->rthis.partdatas.back().outputFaders.back()->SetGainDB(
 											static_cast<float>(*static_cast<double*>(pvalue)));
 									});
 							}
@@ -2649,7 +2649,7 @@ namespace json2wav
 						virtual void OnBool(bool value) override
 						{
 							this->up();
-							this->rthis.partdatas.back().noteampsdb = value;
+							this->rthis.partdatas.back().bNoteAmpsDB = value;
 						}
 					};
 
@@ -2764,7 +2764,7 @@ namespace json2wav
 						private:
 							virtual void OnPushNode() override
 							{
-								const size_t offset = this->rthis.partdatas.back().isrhythm;
+								const size_t offset = this->rthis.partdatas.back().bIsRhythm;
 								this->rthis.mode = valuemodes[offset];
 								nextmode = 1 + 2*offset;
 							}
@@ -2839,7 +2839,7 @@ namespace json2wav
 								virtual void OnPopNode() override
 								{
 									this->up();
-									if (!this->rthis.partdatas.back().isrhythm &&
+									if (!this->rthis.partdatas.back().bIsRhythm &&
 										this->rthis.partdatas.back().notes.back().freq == 0.0f)
 										this->error("Just intonation pitch values must take 2 numbers in an array, and cannot be 0");
 								}
@@ -3230,10 +3230,10 @@ namespace json2wav
 			}
 		};
 
-		class FX : public NonErrorMode
+		class Effects : public NonErrorMode
 		{
 		public:
-			FX(JsonInterpreter& rthisInit)
+			Effects(JsonInterpreter& rthisInit)
 				: NonErrorMode(rthisInit, &rthisInit.error),
 				params(rthisInit, this),
 				bTwoPops(false)
@@ -3241,7 +3241,7 @@ namespace json2wav
 			}
 
 		private:
-			virtual std::string ModeName() const override { return "FX"; }
+			virtual std::string ModeName() const override { return "Effects"; }
 
 		private:
 			void OnNode()
@@ -3250,7 +3250,7 @@ namespace json2wav
 			}
 
 		private:
-			enum class EValidFX
+			enum class EValidEffects
 			{
 				BiquadLP, BiquadHP, BiquadAP, BiquadNotch, BiquadPeak, BiquadLoShelf, BiquadHiShelf,
 				Ladder, BesselLP, Panner, Fader, Delay, Distortion, BusDistortion, RingMod, RingModSum,
@@ -3301,7 +3301,7 @@ namespace json2wav
 			static constexpr const uint64_t ParamsDelayFeedback = ParamDelayBit | ParamFeedbackBit;
 			static constexpr const uint64_t ParamsCompressor = 0x7f00;
 
-			static constexpr const uint64_t FXParams[static_cast<size_t>(EValidFX::NUM)] = {
+			static constexpr const uint64_t EffectsParams[static_cast<size_t>(EValidEffects::NUM)] = {
 				ParamFreqBit | ParamQBit | ParamTopoBit, // BiquadLP
 				ParamFreqBit | ParamQBit | ParamTopoBit, // BiquadHP
 				ParamFreqBit | ParamQBit | ParamTopoBit, // BiquadAP
@@ -3332,45 +3332,45 @@ namespace json2wav
 				bTwoPops = true;
 				this->rthis.mode = &params;
 				if (nodekey == "bqlopass")
-					params.SetEffect(EValidFX::BiquadLP);
+					params.SetEffect(EValidEffects::BiquadLP);
 				else if (nodekey == "bqhipass")
-					params.SetEffect(EValidFX::BiquadHP);
+					params.SetEffect(EValidEffects::BiquadHP);
 				else if (nodekey == "bqallpass")
-					params.SetEffect(EValidFX::BiquadAP);
+					params.SetEffect(EValidEffects::BiquadAP);
 				else if (nodekey == "bqnotch")
-					params.SetEffect(EValidFX::BiquadNotch);
+					params.SetEffect(EValidEffects::BiquadNotch);
 				else if (nodekey == "bqpeak")
-					params.SetEffect(EValidFX::BiquadPeak);
+					params.SetEffect(EValidEffects::BiquadPeak);
 				else if (nodekey == "bqloshelf")
-					params.SetEffect(EValidFX::BiquadLoShelf);
+					params.SetEffect(EValidEffects::BiquadLoShelf);
 				else if (nodekey == "bqhishelf")
-					params.SetEffect(EValidFX::BiquadHiShelf);
+					params.SetEffect(EValidEffects::BiquadHiShelf);
 				else if (nodekey == "ladder")
-					params.SetEffect(EValidFX::Ladder);
+					params.SetEffect(EValidEffects::Ladder);
 				else if (nodekey == "bessellopass")
-					params.SetEffect(EValidFX::BesselLP);
+					params.SetEffect(EValidEffects::BesselLP);
 				else if (nodekey == "panner")
-					params.SetEffect(EValidFX::Panner);
+					params.SetEffect(EValidEffects::Panner);
 				else if (nodekey == "fader")
-					params.SetEffect(EValidFX::Fader);
+					params.SetEffect(EValidEffects::Fader);
 				else if (nodekey == "delay")
-					params.SetEffect(EValidFX::Delay);
+					params.SetEffect(EValidEffects::Delay);
 				else if (nodekey == "distortion")
-					params.SetEffect(EValidFX::Distortion);
+					params.SetEffect(EValidEffects::Distortion);
 				else if (nodekey == "busdistortion" || nodekey == "busdrive")
-					params.SetEffect(EValidFX::BusDistortion);
+					params.SetEffect(EValidEffects::BusDistortion);
 				else if (nodekey == "ringmod")
-					params.SetEffect(EValidFX::RingMod);
+					params.SetEffect(EValidEffects::RingMod);
 				else if (nodekey == "ringmodsum")
-					params.SetEffect(EValidFX::RingModSum);
+					params.SetEffect(EValidEffects::RingModSum);
 				else if (nodekey == "compressor" || nodekey == "comp")
-					params.SetEffect(EValidFX::Compressor);
+					params.SetEffect(EValidEffects::Compressor);
 				else if (nodekey == "reverb" || nodekey == "verb")
-					params.SetEffect(EValidFX::Reverb);
+					params.SetEffect(EValidEffects::Reverb);
 				else if (nodekey == "ms")
-					params.SetEffect(EValidFX::MSConverter);
+					params.SetEffect(EValidEffects::MSConverter);
 				else if (nodekey == "lr")
-					params.SetEffect(EValidFX::LRConverter);
+					params.SetEffect(EValidEffects::LRConverter);
 				else
 					this->InvalidKeyError(std::move(nodekey));
 			}
@@ -3393,17 +3393,17 @@ namespace json2wav
 
 				void Reset() { paramsSet = 0; }
 
-				void SetEffect(const EValidFX eFX) { eEffect = eFX; }
+				void SetEffect(const EValidEffects eEffects) { eEffect = eEffects; }
 
 			private:
-				virtual std::string ModeName() const override { return "FX::Params"; }
+				virtual std::string ModeName() const override { return "Effects::Params"; }
 
 			private:
 				void OnNode(std::string&& nodekey)
 				{
 					if (nodekey == "freq")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamFreqBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamFreqBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									freq = *static_cast<double*>(pvalue);
@@ -3414,7 +3414,7 @@ namespace json2wav
 					}
 					else if (nodekey == "q")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamQBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamQBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									q = *static_cast<double*>(pvalue);
@@ -3425,7 +3425,7 @@ namespace json2wav
 					}
 					else if (nodekey == "gain")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamGainBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamGainBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									gain = *static_cast<double*>(pvalue);
@@ -3436,7 +3436,7 @@ namespace json2wav
 					}
 					else if (nodekey == "topo")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamTopoBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamTopoBit)
 							this->rthis.PushMode(&this->rthis.paramStr, [this](void* pvalue)
 								{
 									topo = std::move(*static_cast<std::string*>(pvalue));
@@ -3447,7 +3447,7 @@ namespace json2wav
 					}
 					else if (nodekey == "order")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamOrderBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamOrderBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									order = *static_cast<double*>(pvalue);
@@ -3458,7 +3458,7 @@ namespace json2wav
 					}
 					else if (nodekey == "pan")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamPanBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamPanBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									pan = *static_cast<double*>(pvalue);
@@ -3470,7 +3470,7 @@ namespace json2wav
 					else if (nodekey == "delay" || nodekey == "time" || nodekey == "seconds"
 						|| nodekey == "delayseconds" || nodekey == "timeseconds" || nodekey == "rt60")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									delay = *static_cast<double*>(pvalue);
@@ -3481,7 +3481,7 @@ namespace json2wav
 					}
 					else if (nodekey == "delayms" || nodekey == "timems" || nodekey == "ms")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									delay = *static_cast<double*>(pvalue) / 1000.0;
@@ -3492,7 +3492,7 @@ namespace json2wav
 					}
 					else if (nodekey == "delaybeats" || nodekey == "timebeats" || nodekey == "beats")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamDelayBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									delay = *static_cast<double*>(pvalue) * this->rthis.beatlen;
@@ -3503,7 +3503,7 @@ namespace json2wav
 					}
 					else if (nodekey == "feedback")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									feedback = *static_cast<double*>(pvalue);
@@ -3515,7 +3515,7 @@ namespace json2wav
 					}
 					else if (nodekey == "feedbackdb")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									feedback = *static_cast<double*>(pvalue);
@@ -3527,7 +3527,7 @@ namespace json2wav
 					}
 					else if (nodekey == "feedbackdbneg")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamFeedbackBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									feedback = *static_cast<double*>(pvalue);
@@ -3539,7 +3539,7 @@ namespace json2wav
 					}
 					else if (nodekey == "threshold" || nodekey == "thresholddb")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamThresholdBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamThresholdBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									threshold = *static_cast<double*>(pvalue);
@@ -3550,7 +3550,7 @@ namespace json2wav
 					}
 					else if (nodekey == "ratio")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamRatioBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamRatioBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									ratio = *static_cast<double*>(pvalue);
@@ -3561,7 +3561,7 @@ namespace json2wav
 					}
 					else if (nodekey == "knee" || nodekey == "kneedb")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamKneeBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamKneeBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									knee = *static_cast<double*>(pvalue);
@@ -3572,7 +3572,7 @@ namespace json2wav
 					}
 					else if (nodekey == "attack" || nodekey == "attackms")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamAttackBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamAttackBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									attack_ms = *static_cast<double*>(pvalue);
@@ -3583,7 +3583,7 @@ namespace json2wav
 					}
 					else if (nodekey == "release" || nodekey == "releasems")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamReleaseBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamReleaseBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									release_ms = *static_cast<double*>(pvalue);
@@ -3594,7 +3594,7 @@ namespace json2wav
 					}
 					else if (nodekey == "dryvolume" || nodekey == "drygain" || nodekey == "drygaindb")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamDryVolumeBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamDryVolumeBit)
 							this->rthis.PushMode(&this->rthis.paramNum, [this](void* pvalue)
 								{
 									dryVolume_db = *static_cast<double*>(pvalue);
@@ -3605,7 +3605,7 @@ namespace json2wav
 					}
 					else if (nodekey == "link" || nodekey == "stereolink")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] & ParamStereoLinkBit)
+						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamStereoLinkBit)
 							this->rthis.PushMode(&this->rthis.paramBool, [this](void* pvalue)
 								{
 									bLink = *static_cast<bool*>(pvalue);
@@ -3616,7 +3616,7 @@ namespace json2wav
 					}
 					else if (nodekey == "none")
 					{
-						if (FXParams[static_cast<size_t>(eEffect)] == ParamsNone)
+						if (EffectsParams[static_cast<size_t>(eEffect)] == ParamsNone)
 							this->rthis.PushMode(&this->rthis.paramNum, [](void* pvalue) {});
 						else
 							this->InvalidKeyError(std::move(nodekey));
@@ -3633,15 +3633,15 @@ namespace json2wav
 					this->up();
 					if (topo != "df2")
 						paramsSet &= ~ParamTopoBit;
-					if (eEffect != EValidFX::Distortion && eEffect != EValidFX::BusDistortion &&
-						eEffect != EValidFX::BesselLP && static_cast<unsigned int>(order) != 2)
+					if (eEffect != EValidEffects::Distortion && eEffect != EValidEffects::BusDistortion &&
+						eEffect != EValidEffects::BesselLP && static_cast<unsigned int>(order) != 2)
 					{
 						paramsSet &= ~ParamOrderBit;
 					}
 
 					switch (eEffect)
 					{
-					case EValidFX::BiquadLP:
+					case EValidEffects::BiquadLP:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3663,7 +3663,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadHP:
+					case EValidEffects::BiquadHP:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3685,7 +3685,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadAP:
+					case EValidEffects::BiquadAP:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3707,7 +3707,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadNotch:
+					case EValidEffects::BiquadNotch:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3729,7 +3729,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadPeak:
+					case EValidEffects::BiquadPeak:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3757,7 +3757,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadLoShelf:
+					case EValidEffects::BiquadLoShelf:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3785,7 +3785,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BiquadHiShelf:
+					case EValidEffects::BiquadHiShelf:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3813,7 +3813,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::Ladder:
+					case EValidEffects::Ladder:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3851,7 +3851,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::BesselLP:
+					case EValidEffects::BesselLP:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(
@@ -3877,7 +3877,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::Panner:
+					case EValidEffects::Panner:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<Panner<>>()); break;
@@ -3886,7 +3886,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::Fader:
+					case EValidEffects::Fader:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(this->rthis.ctrls.template CreatePtr<Fader<>>()); break;
@@ -3895,7 +3895,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::Delay:
+					case EValidEffects::Delay:
 						if (!(paramsSet & ParamDelayBit))
 						{
 							this->error("Must specify delay amount");
@@ -3929,7 +3929,7 @@ namespace json2wav
 							this->rthis.addEffect(std::move(delayptr));
 						}
 						break;
-					case EValidFX::Distortion:
+					case EValidEffects::Distortion:
 					{
 						constexpr const EChebyDistWaveShaper eWaveShaper = EChebyDistWaveShaper::InverseSquareGaussianBoost;
 						const int iorder = (paramsSet & ParamOrderBit) ? static_cast<int>(order) : 5;
@@ -3944,7 +3944,7 @@ namespace json2wav
 						default: this->error("Invalid distortion order (must be 2-6)");
 						}
 					} break;
-					case EValidFX::BusDistortion:
+					case EValidEffects::BusDistortion:
 					{
 						constexpr const EChebyDistWaveShaper eWaveShaper = EChebyDistWaveShaper::InverseQuart;
 						const int iorder = (paramsSet & ParamOrderBit) ? static_cast<int>(order) : 5;
@@ -3957,13 +3957,13 @@ namespace json2wav
 						default: this->error("Invalid bus distortion order (must be 4-6)");
 						}
 					} break;
-					case EValidFX::RingMod:
+					case EValidEffects::RingMod:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(MakeShared<BasicRingMod<>>()); break;
 						default: this->error("Invalid effect parameters"); break;
 						}
-					case EValidFX::RingModSum:
+					case EValidEffects::RingModSum:
 						switch (paramsSet)
 						{
 						case ParamsNone: this->rthis.addEffect(MakeShared<BasicRingModSum<>>()); break;
@@ -3976,7 +3976,7 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 						break;
-					case EValidFX::Compressor:
+					case EValidEffects::Compressor:
 					{
 						SharedPtr<Compressor<>> ptr(MakeShared<Compressor<>>());
 						CompressorParams comparams;
@@ -4013,7 +4013,7 @@ namespace json2wav
 						ptr->SetParams(comparams, bLink);
 						this->rthis.addEffect(std::move(ptr));
 					} break;
-					case EValidFX::Reverb:
+					case EValidEffects::Reverb:
 					{
 						switch (paramsSet)
 						{
@@ -4022,13 +4022,13 @@ namespace json2wav
 						default: this->error("Invalid effect parameters"); break;
 						}
 					} break;
-					case EValidFX::MSConverter:
+					case EValidEffects::MSConverter:
 						if (paramsSet == ParamsNone)
 							this->rthis.addEffect(MakeShared<MSConverter<>>());
 						else
 							this->error("Invalid effect parameters");
 						break;
-					case EValidFX::LRConverter:
+					case EValidEffects::LRConverter:
 						if (paramsSet == ParamsNone)
 							this->rthis.addEffect(MakeShared<LRConverter<>>());
 						else
@@ -4039,7 +4039,7 @@ namespace json2wav
 				}
 
 			private:
-				EValidFX eEffect;
+				EValidEffects eEffect;
 				double freq;
 				double q;
 				double gain;
@@ -4201,7 +4201,7 @@ namespace json2wav
 		};
 
 	private:
-		Utility::TypeIf_t<bLog, ModeLogger, InterpreterMode*> mode;
+		Utility::ConditionalType<bLog, ModeLogger, InterpreterMode*> mode;
 		Vector<std::pair<InterpreterMode*, std::function<void(void*)>>> modestack;
 		Error error;
 		Done done;
@@ -4210,7 +4210,7 @@ namespace json2wav
 		Mixer mixer;
 		Parts parts;
 		Volume volume;
-		FX fx;
+		Effects effects;
 		ParamNumber paramNum;
 		ParamString paramStr;
 		ParamBool paramBool;
@@ -4234,24 +4234,24 @@ namespace json2wav
 	};
 
 	template<bool bLog>
-	void JsonInterpreter_t<bLog>::NonErrorMode::error()
+	void JsonInterpreterType<bLog>::NonErrorMode::error()
 	{
 		this->rthis.mode = &this->rthis.error;
 	}
 
 	template<bool bLog>
-	void JsonInterpreter_t<bLog>::NonErrorMode::up()
+	void JsonInterpreterType<bLog>::NonErrorMode::up()
 	{
 		this->rthis.mode = pup;
 	}
 
-	template<> void JsonInterpreter_t<false>::Top::LogWritingWav() const {}
-	template<> void JsonInterpreter_t<true>::Top::LogWritingWav() const
+	template<> void JsonInterpreterType<false>::Top::LogWritingWav() const {}
+	template<> void JsonInterpreterType<true>::Top::LogWritingWav() const
 	{
 		std::cout << "Writing " << this->rthis.name << ".wav...\n";
 	}
 
-	using JsonInterpreter = JsonInterpreter_t<false>;
-	using JsonInterpreter_Logging = JsonInterpreter_t<true>;
+	using JsonInterpreter = JsonInterpreterType<false>;
+	using JsonInterpreter_Logging = JsonInterpreterType<true>;
 }
 

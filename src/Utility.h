@@ -302,32 +302,32 @@ namespace json2wav
 			return detail::NextPow2Impl<sizeof(IntType)>::Do(val);
 		}
 
-		template<bool B, typename T, typename F> struct TypeIf;
-		template<typename T, typename F> struct TypeIf<false, T, F>
+		template<bool B, typename T, typename F> struct ConditionalImpl;
+		template<typename T, typename F> struct ConditionalImpl<false, T, F>
 		{
-			using type = F;
+			using Type = F;
 			template<typename U, typename V>
-			static constexpr inline type value(U&& u, V&& v)
+			static constexpr inline Type Value(U&& u, V&& v)
 			{
-				type val(std::forward<V>(v));
-				return val;
+				Type value(std::forward<V>(v));
+				return value;
 			}
 		};
-		template<typename T, typename F> struct TypeIf<true, T, F>
+		template<typename T, typename F> struct ConditionalImpl<true, T, F>
 		{
-			using type = T;
+			using Type = T;
 			template<typename U, typename V>
-			static constexpr inline type value(U&& u, V&& v)
+			static constexpr inline Type Value(U&& u, V&& v)
 			{
-				type val(std::forward<U>(u));
-				return val;
+				Type value(std::forward<U>(u));
+				return value;
 			}
 		};
-		template<bool B, typename T, typename F> using TypeIf_t = typename TypeIf<B, T, F>::type;
+		template<bool B, typename T, typename F> using ConditionalType = typename ConditionalImpl<B, T, F>::Type;
 		template<bool B, typename R, typename T, typename F>
-		inline constexpr R TypeIf_v(T&& t, F&& f)
+		inline constexpr R ConditionalValue(T&& t, F&& f)
 		{
-			R r(TypeIf<B, T, F>::value(std::forward<T>(t), std::forward<F>(f)));
+			R r(ConditionalImpl<B, T, F>::Value(std::forward<T>(t), std::forward<F>(f)));
 			return r;
 		}
 
