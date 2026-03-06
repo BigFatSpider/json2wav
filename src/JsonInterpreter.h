@@ -3443,7 +3443,24 @@ namespace json2wav
 			{
 			public:
 				Params(JsonInterpreter& rthisInit, InterpreterMode* const pupInit)
-					: NonErrorMode(rthisInit, pupInit)
+					: NonErrorMode(rthisInit, pupInit),
+					eEffect(EValidEffects::NUM),
+					freq(0.0),
+					q(0.0),
+					gain(0.0),
+					order(0.0),
+					pan(0.0),
+					delay(0.0),
+					feedback(0.0),
+					fbt(EFeedbackType::Gain),
+					threshold(0.0),
+					ratio(0.0),
+					knee(0.0),
+					attack_ms(0.0),
+					release_ms(0.0),
+					dryVolume_db(0.0),
+					bLink(false),
+					paramsSet(0ull)
 				{
 				}
 
@@ -3457,6 +3474,12 @@ namespace json2wav
 			private:
 				void OnNode(std::string&& nodekey)
 				{
+					if (static_cast<size_t>(eEffect) >= static_cast<size_t>(EValidEffects::NUM))
+					{
+						this->error("Effect type not set");
+						return;
+					}
+
 					if (nodekey == "freq")
 					{
 						if (EffectsParams[static_cast<size_t>(eEffect)] & ParamFreqBit)
